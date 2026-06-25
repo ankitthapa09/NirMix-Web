@@ -1,79 +1,112 @@
-import { Star } from "lucide-react";
+import Image from "next/image";
+import { Star, ChevronLeft, ChevronRight } from "lucide-react";
 
 const testimonials = [
   {
     name: "Sita Devi",
-    role: "Property Buyer",
-    avatar: "SD",
-    rating: 5,
-    text: "Thanks to NirMix, we found our dream home in Lalitpur within two weeks. The agents were professional, verified, and responded within hours. Highly recommended!",
+    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80",
+    cover: "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=600&q=80",
+    rating: "5.0",
+    text: "Dwello truly cares about their clients. They listened to my needs and preferences and helped me find the perfect home in the Bay Area. Their professionalism and attention to detail are unmatched.",
   },
   {
     name: "Ram Thapa",
-    role: "Real Estate Agent",
-    avatar: "RT",
-    rating: 5,
-    text: "As an agent, listing on NirMix brought me quality leads that actually convert. The dashboard tracking and valuation tools give my clients complete transparency.",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80",
+    cover: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=600&q=80",
+    rating: "4.5",
+    text: "I had a fantastic experience working with Dwello. Their expertise and personalized service exceeded my expectations. I found my dream home quickly and smoothly. Highly recommended!",
   },
   {
-    name: "Surendra Tamang",
-    role: "Contractor",
-    avatar: "ST",
-    rating: 5,
-    text: "NirMix's calculators and material estimators have saved me hours of manual work. Their platform connects me directly with site owners looking for quality builders.",
+    name: "Ravindra Tamang",
+    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=150&q=80",
+    cover: "https://images.unsplash.com/photo-1616594039964-ae9021a400a0?auto=format&fit=crop&w=600&q=80",
+    rating: "5.0",
+    text: "Dwello made my dream of owning a home a reality! Their team provided exceptional support and guided me through every step of the process. I couldn't be happier with my new home!",
   },
 ];
 
 export function Testimonials() {
   return (
-    <section className="px-4 py-20 sm:px-6 lg:px-8">
+    <section className="px-4 py-16 sm:px-6 lg:px-8 bg-transparent">
       <div className="mx-auto max-w-7xl">
         {/* Header */}
         <div className="mb-12 text-center">
-          <h2 className="text-3xl font-extrabold text-ink sm:text-4xl">
+          <h2 className="text-2xl font-extrabold text-[#342417] sm:text-3xl">
             What People Say
             <br />
             About NirMix
           </h2>
         </div>
 
-        {/* Cards */}
+        {/* Cards Grid */}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           {testimonials.map((t) => (
             <div
               key={t.name}
-              className="rounded-2xl border border-mist/60 bg-paper p-7 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
+              className="overflow-hidden rounded-2xl border border-[#E0D4C5] bg-[#F0E5DA]/40 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md flex flex-col"
             >
-              {/* User Info */}
-              <div className="mb-4 flex items-center gap-4">
-                {/* Avatar Circle */}
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-ember/10 text-sm font-bold text-ember">
-                  {t.avatar}
-                </div>
-                <div>
-                  <div className="text-sm font-bold text-ink">{t.name}</div>
-                  <div className="text-[11px] text-slate">{t.role}</div>
-                </div>
+              {/* Room Image */}
+              <div className="relative h-44 w-full">
+                <Image
+                  src={t.cover}
+                  alt="Room decoration"
+                  fill
+                  className="object-cover"
+                  sizes="(max-w-768px) 100vw, 33vw"
+                />
               </div>
 
-              {/* Stars */}
-              <div className="mb-3 flex gap-0.5">
-                {Array.from({ length: t.rating }).map((_, i) => (
-                  <Star
-                    key={i}
-                    className="h-4 w-4 fill-amber-400 text-amber-400"
-                  />
-                ))}
-              </div>
+              {/* Card Body */}
+              <div className="p-5 flex-1 flex flex-col justify-between">
+                {/* User Row */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="relative h-9 w-9 overflow-hidden rounded-full border border-white shadow-xs">
+                      <Image
+                        src={t.avatar}
+                        alt={t.name}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <span className="text-xs font-bold text-[#342417]">{t.name}</span>
+                  </div>
 
-              {/* Quote */}
-              <p className="text-xs leading-relaxed text-slate">
-                &ldquo;{t.text}&rdquo;
-              </p>
+                  {/* Rating Badge */}
+                  <div className="flex items-center gap-1 bg-[#FFC529] px-2 py-0.5 rounded-sm text-[10px] font-extrabold text-[#342417]">
+                    <Star className="h-3 w-3 fill-[#342417] text-[#342417]" />
+                    <span>{t.rating}</span>
+                  </div>
+                </div>
+
+                {/* Quote */}
+                <p className="text-xs leading-relaxed text-[#5C4D3C] font-medium">
+                  {t.text}
+                </p>
+              </div>
             </div>
           ))}
+        </div>
+
+        {/* Slider Controls */}
+        <div className="mt-10 flex justify-center gap-4">
+          <button
+            type="button"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#342417] text-white hover:bg-[#251910] transition-colors cursor-pointer shadow-xs"
+            aria-label="Previous testimonial"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#342417] text-white hover:bg-[#251910] transition-colors cursor-pointer shadow-xs"
+            aria-label="Next testimonial"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
         </div>
       </div>
     </section>
   );
 }
+

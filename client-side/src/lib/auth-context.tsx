@@ -35,15 +35,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedUser = localStorage.getItem("nirmix_user");
     const storedToken = localStorage.getItem("nirmix_token");
     
-    if (storedUser && storedToken) {
-      try {
-        setUser(JSON.parse(storedUser));
-        setAccessToken(storedToken);
-      } catch (e) {
-        console.error("Failed to parse stored user", e);
+    // Defer state updates to avoid synchronous cascading renders warning
+    setTimeout(() => {
+      if (storedUser && storedToken) {
+        try {
+          setUser(JSON.parse(storedUser));
+          setAccessToken(storedToken);
+        } catch (e) {
+          console.error("Failed to parse stored user", e);
+        }
       }
-    }
-    setIsLoading(false);
+      setIsLoading(false);
+    }, 0);
   }, []);
 
   const login = (token: string, refreshToken: string, userData: User) => {

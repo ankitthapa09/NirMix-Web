@@ -1,101 +1,115 @@
 import Image from "next/image";
 import Link from "next/link";
-import { MapPin, BedDouble, Bath, Maximize } from "lucide-react";
-import { getFeaturedProperties } from "@/lib/mock-data";
+import { MapPin, ChevronLeft, ChevronRight, Home, Maximize } from "lucide-react";
+
+const properties = [
+  {
+    id: 1,
+    image: "/images/property-1.png",
+    location: "San Francisco, California",
+    rooms: 4,
+    area: "3,500 sq ft",
+    price: "$2,500,000",
+  },
+  {
+    id: 2,
+    image: "/images/property-2.png",
+    location: "Beverly Hills, California",
+    rooms: 3,
+    area: "1,500 sq ft",
+    price: "$850,000",
+  },
+  {
+    id: 3,
+    image: "/images/property-3.png",
+    location: "Palo Alto, California",
+    rooms: 6,
+    area: "4,000 sq ft",
+    price: "$3,700,000",
+  },
+];
 
 export function PopularResidences() {
-  const featured = getFeaturedProperties();
-
-  const formatPrice = (price: number, status: string) => {
-    if (status === "For Rent") {
-      return `NPR ${price.toLocaleString("en-NP")}/mo`;
-    }
-    if (price >= 10000000) {
-      return `NPR ${(price / 10000000).toFixed(1)} Cr`;
-    }
-    if (price >= 100000) {
-      return `NPR ${(price / 100000).toFixed(1)} Lakh`;
-    }
-    return `NPR ${price.toLocaleString("en-NP")}`;
-  };
-
   return (
-    <section className="px-4 py-20 sm:px-6 lg:px-8">
+    <section className="bg-[#FAF7F0] px-4 py-16 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
         {/* Header */}
         <div className="mb-12 text-center">
-          <h2 className="text-3xl font-extrabold text-ink sm:text-4xl">
+          <h2 className="text-4xl font-extrabold text-[#342417] sm:text-5xl">
             Our Popular Residences
           </h2>
         </div>
 
-        {/* Property Grid */}
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {featured.map((property) => (
-            <Link
+        {/* Property Grid (3 columns) */}
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {properties.map((property) => (
+            <div
               key={property.id}
-              href={`/properties/${property.id}`}
-              className="group overflow-hidden rounded-2xl border border-mist/60 bg-paper shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+              className="group overflow-hidden rounded-3xl bg-[#EAE0D5]/40 border border-[#342417]/5 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
             >
               {/* Image */}
-              <div className="relative aspect-[4/3] overflow-hidden">
+              <div className="relative aspect-[4/3] overflow-hidden m-3 rounded-2xl">
                 <Image
-                  src={property.photos[0]}
-                  alt={property.title}
+                  src={property.image}
+                  alt={property.location}
                   fill
                   className="object-cover transition-transform duration-500 group-hover:scale-105"
                 />
-                {/* Status Badge */}
-                <span
-                  className={`absolute left-3 top-3 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm ${
-                    property.status === "For Sale" ? "bg-jade" : "bg-ember"
-                  }`}
-                >
-                  {property.status}
-                </span>
               </div>
 
               {/* Card Body */}
-              <div className="p-4">
+              <div className="px-6 pb-6 pt-2">
                 {/* Location */}
-                <div className="mb-2 flex items-center gap-1.5 text-xs text-slate">
-                  <MapPin className="h-3.5 w-3.5 text-ember" />
-                  <span>
-                    {property.location.neighborhood},{" "}
-                    {property.location.city}
-                  </span>
+                <div className="mb-3 flex items-center gap-1.5 text-sm font-bold text-[#342417]">
+                  <MapPin className="h-4 w-4 text-[#342417]" />
+                  <span>{property.location}</span>
                 </div>
-
-                {/* Title */}
-                <h3 className="text-sm font-bold text-ink line-clamp-1">
-                  {property.title}
-                </h3>
 
                 {/* Specs Row */}
-                <div className="mt-3 flex items-center gap-4 border-t border-mist/40 pt-3 text-[11px] text-slate">
-                  <span className="flex items-center gap-1">
-                    <BedDouble className="h-3.5 w-3.5" />
-                    {property.beds} Beds
+                <div className="flex items-center gap-4 text-xs font-semibold text-[#5C4D3C] pb-4 border-b border-[#342417]/10">
+                  <span className="flex items-center gap-1.5">
+                    <Home className="h-4 w-4 text-[#5C4D3C]/65" />
+                    {property.rooms} Rooms
                   </span>
-                  <span className="flex items-center gap-1">
-                    <Bath className="h-3.5 w-3.5" />
-                    {property.baths} Baths
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Maximize className="h-3.5 w-3.5" />
-                    {property.areaSqft.toLocaleString()} sq ft
+                  <span className="flex items-center gap-1.5">
+                    <Maximize className="h-4 w-4 text-[#5C4D3C]/65" />
+                    {property.area}
                   </span>
                 </div>
 
-                {/* Price */}
-                <div className="mt-3 flex items-center justify-between">
-                  <span className="text-lg font-extrabold text-ember">
-                    {formatPrice(property.price, property.status)}
+                {/* Price & Sign up Button Row */}
+                <div className="mt-4 flex items-center justify-between">
+                  <Link
+                    href="/signup"
+                    className="rounded-md bg-[#342417] px-4 py-1.5 text-[10px] font-bold text-white transition-all hover:bg-[#251910] cursor-pointer"
+                  >
+                    Sign up
+                  </Link>
+                  <span className="text-base font-extrabold text-[#342417]">
+                    {property.price}
                   </span>
                 </div>
               </div>
-            </Link>
+            </div>
           ))}
+        </div>
+
+        {/* Carousel Indicators / Slider Arrows below */}
+        <div className="mt-10 flex items-center justify-center gap-4">
+          <button
+            type="button"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#342417] text-white hover:bg-[#251910] transition-colors cursor-pointer shadow-xs"
+            aria-label="Previous properties"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#342417] text-white hover:bg-[#251910] transition-colors cursor-pointer shadow-xs"
+            aria-label="Next properties"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
         </div>
       </div>
     </section>

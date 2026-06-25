@@ -22,10 +22,10 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       <div className="relative z-10 flex min-h-screen items-center justify-center p-4 backdrop-blur-xs bg-black/25">
         {/* Click outside to close (goes back to home) */}
         <Link href="/" className="absolute inset-0 z-0 cursor-default" aria-label="Close modal" />
-        
+
         {/* Modal content - Shared Card Shell */}
         <div className="relative z-10 w-full max-w-5xl h-[700px] overflow-hidden rounded-3xl bg-paper shadow-2xl shadow-ink/10 animate-slide-down flex">
-          
+
           {/* Persistent Close Button on the top-right of the entire card */}
           <Link
             href="/"
@@ -36,10 +36,9 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           </Link>
 
           {/* SLIDING IMAGE PANEL */}
-          <div 
-            className={`absolute top-0 bottom-0 w-1/2 z-20 transition-all duration-500 ease-in-out hidden lg:flex items-center justify-center p-6 ${
-              isSignup ? "left-1/2" : "left-0"
-            }`}
+          <div
+            className={`absolute top-0 bottom-0 w-1/2 z-20 transition-all duration-500 ease-in-out hidden lg:flex items-center justify-center p-6 ${isSignup ? "left-1/2" : "left-0"
+              }`}
           >
             <Image
               src="/images/nirmix_auth_img.jpg"
