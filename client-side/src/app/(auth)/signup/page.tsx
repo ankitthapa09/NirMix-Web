@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { registerSchema, type RegisterInput } from "../schema";
 import { useAuth } from "@/lib/auth-context";
+import { toast } from "sonner";
 
 export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -42,16 +43,21 @@ export default function SignupPage() {
       const json = await res.json();
 
       if (!res.ok) {
-        setServerError(json.message || "Registration failed. Please try again.");
+        const errorMsg = json.message || "Registration failed. Please try again.";
+        setServerError(errorMsg);
+        toast.error(errorMsg);
         return;
       }
 
       const { user, accessToken, refreshToken } = json.data;
       login(accessToken, refreshToken, user);
+      toast.success("Account created successfully! Welcome to NirMix.");
       router.push("/");
       router.refresh();
     } catch {
-      setServerError("Network error. Please try again.");
+      const networkError = "Network error. Please try again.";
+      setServerError(networkError);
+      toast.error(networkError);
     }
   }
 

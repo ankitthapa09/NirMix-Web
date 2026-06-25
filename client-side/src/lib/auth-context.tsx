@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export interface User {
   id: string;
@@ -72,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem("nirmix_user");
       setAccessToken(null);
       setUser(null);
+      toast.success("Logged out successfully.");
       router.push("/");
     }
   };

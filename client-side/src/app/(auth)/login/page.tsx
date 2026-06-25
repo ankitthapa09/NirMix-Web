@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, ArrowRight, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
 import { loginSchema, type LoginInput } from "../schema";
 import { useAuth } from "@/lib/auth-context";
 
@@ -34,16 +35,21 @@ export default function LoginPage() {
       const json = await res.json();
 
       if (!res.ok) {
-        setServerError(json.message || "Invalid credentials. Please try again.");
+        const errorMsg = json.message || "Invalid credentials. Please try again.";
+        setServerError(errorMsg);
+        toast.error(errorMsg);
         return;
       }
 
       const { user, accessToken, refreshToken } = json.data;
       login(accessToken, refreshToken, user);
+      toast.success("Welcome back! Login successful.");
       router.push("/");
       router.refresh();
     } catch {
-      setServerError("Network error. Please try again.");
+      const networkError = "Network error. Please try again.";
+      setServerError(networkError);
+      toast.error(networkError);
     }
   }
 
