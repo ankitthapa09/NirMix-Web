@@ -6,7 +6,7 @@ import authRoutes from './src/routes/auth.routes.js';
 import { errorHandler, notFoundHandler } from './src/middlewares/error.middleware.js';
 import 'dotenv/config';
 
-const PORT = Number(process.env.PORT) || 6000;
+const PORT = Number(process.env.PORT) || 5001;
 const app: Express = express();
 
 // MIDDLEWARE

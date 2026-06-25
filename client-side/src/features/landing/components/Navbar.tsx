@@ -4,9 +4,11 @@ import Link from "next/link";
 import { useState } from "react";
 import { Search, Menu, X } from "lucide-react";
 import { siteConfig } from "@/config/site.config";
+import { useAuth } from "@/lib/auth-context";
 
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { user, logout, isAuthenticated } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 border-b border-mist/60 bg-paper/80 backdrop-blur-md">
@@ -44,12 +46,35 @@ export function Navbar() {
           >
             <Search className="h-5 w-5" />
           </button>
-          <Link
-            href={siteConfig.cta.href}
-            className="rounded-full bg-ember px-6 py-2.5 text-sm font-bold text-white shadow-md shadow-ember/15 transition-all hover:-translate-y-0.5 hover:bg-ember/90"
-          >
-            {siteConfig.cta.label}
-          </Link>
+          
+          {isAuthenticated && user ? (
+            <div className="flex items-center gap-4">
+              <span className="text-sm font-semibold text-slate">
+                Hi, {user.name.split(" ")[0]}
+              </span>
+              <button
+                onClick={logout}
+                className="rounded-full border border-mist bg-paper px-5 py-2 text-sm font-bold text-ink transition-colors hover:bg-red-500 hover:text-white hover:border-red-500 cursor-pointer"
+              >
+                Sign Out
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-4">
+              <Link
+                href="/login"
+                className="text-sm font-semibold text-slate hover:text-ember transition-colors"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/signup"
+                className="rounded-full bg-ember px-6 py-2.5 text-sm font-bold text-white shadow-md shadow-ember/15 transition-all hover:-translate-y-0.5 hover:bg-ember/90"
+              >
+                Sign Up
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* Mobile Toggle */}
@@ -77,20 +102,39 @@ export function Navbar() {
             ))}
           </nav>
           <div className="mt-4 flex flex-col gap-3 border-t border-mist pt-4">
-            <Link
-              href="/login"
-              onClick={() => setMobileOpen(false)}
-              className="w-full rounded-xl py-2.5 text-center text-sm font-semibold text-slate transition-colors hover:bg-sand"
-            >
-              Sign In
-            </Link>
-            <Link
-              href={siteConfig.cta.href}
-              onClick={() => setMobileOpen(false)}
-              className="w-full rounded-xl bg-ember py-2.5 text-center text-sm font-bold text-white shadow-md"
-            >
-              {siteConfig.cta.label}
-            </Link>
+            {isAuthenticated && user ? (
+              <>
+                <span className="text-sm font-semibold text-ink px-4 py-1">
+                  Logged in as {user.name}
+                </span>
+                <button
+                  onClick={() => {
+                    setMobileOpen(false);
+                    logout();
+                  }}
+                  className="w-full rounded-xl bg-red-500 py-2.5 text-center text-sm font-bold text-white shadow-md transition-colors hover:bg-red-600 cursor-pointer"
+                >
+                  Sign Out
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  onClick={() => setMobileOpen(false)}
+                  className="w-full rounded-xl py-2.5 text-center text-sm font-semibold text-slate transition-colors hover:bg-sand"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href="/signup"
+                  onClick={() => setMobileOpen(false)}
+                  className="w-full rounded-xl bg-ember py-2.5 text-center text-sm font-bold text-white shadow-md"
+                >
+                  Sign Up
+                </Link>
+              </>
+            )}
           </div>
         </div>
       )}
