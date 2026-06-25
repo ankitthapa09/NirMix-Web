@@ -1,13 +1,15 @@
 import express, { Express } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import { connectDB } from './src/config/db.js'; // Note the .js extension required for NodeNext module resolution
+import { connectDB } from './src/config/db.js';
+import authRoutes from './src/routes/auth.routes.js';
+import { errorHandler, notFoundHandler } from './src/middlewares/error.middleware.js';
 import 'dotenv/config';
 
 const PORT = Number(process.env.PORT) || 6000;
 const app: Express = express();
 
-// ============== MIDDLEWARE ==============
+// MIDDLEWARE
 
 // Security Middlewares
 app.use(helmet());
@@ -20,14 +22,25 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-// ============== ROUTES ==============
+// ROUTES
 
 // Health check route
 app.get('/api/health', (req, res) => {
   res.json({ message: 'Server is running', timestamp: new Date() });
 });
 
-// ============== START SERVER ==============
+// Auth Routes
+app.use('/api/auth', authRoutes);
+
+// ERROR HANDLING 
+
+// 404 Handler (must be before error handler)
+app.use(notFoundHandler);
+
+// Global Error Handler (must be last)
+app.use(errorHandler);
+
+// START SERVER 
 
 const startServer = async (): Promise<void> => {
   try {
