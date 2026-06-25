@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+client-side/node_modules/
+server-side/node_modules/
+
+# Next.js builds and cache
+client-side/.next/
+client-side/out/
+client-side/tsconfig.tsbuildinfo
+
+# Backend builds
+server-side/dist/
+
+# Env files
+.env
+.env.local
+server-side/.env
+client-side/.env
+
+# OS files
+.DS_Store
