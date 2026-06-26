@@ -13,9 +13,11 @@ export type Property = {
   beds: number;
   baths: number;
   areaSqft: number;
+  areaUnit?: "sqft" | "Aana";
   photos: string[];
   status: "For Sale" | "For Rent";
   featured?: boolean;
+  tag?: "NEW" | "VERIFIED" | "HOT";
   description: string;
   agent: {
     name: string;
