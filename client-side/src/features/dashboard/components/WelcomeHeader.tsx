@@ -4,7 +4,11 @@ import { useAuth } from "@/lib/auth-context";
 import { Home, Building2, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
-export function WelcomeHeader() {
+interface WelcomeHeaderProps {
+  onStartListing: () => void;
+}
+
+export function WelcomeHeader({ onStartListing }: WelcomeHeaderProps) {
   const { user } = useAuth();
 
   return (
@@ -44,12 +48,13 @@ export function WelcomeHeader() {
             Sell or rent your home, land or commercial space — reach thousands
             of verified buyers.
           </p>
-          <Link
-            href="/dashboard/post-listing"
-            className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-[#342417] bg-transparent px-4 py-2 text-xs font-bold text-[#342417] transition hover:bg-[#342417] hover:text-white"
+          <button
+            type="button"
+            onClick={onStartListing}
+            className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-[#342417] bg-transparent px-4 py-2 text-xs font-bold text-[#342417] transition hover:bg-[#342417] hover:text-white cursor-pointer"
           >
             Start listing <ArrowRight className="h-3 w-3" />
-          </Link>
+          </button>
         </div>
 
         {/* For Professionals */}
