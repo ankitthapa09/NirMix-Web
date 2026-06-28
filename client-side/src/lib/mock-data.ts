@@ -210,6 +210,54 @@ export const listingProperties: Property[] = [
     description:
       "Architect-designed villa with double-height living, landscaped garden, smart-home automation and panoramic valley views.",
     agent: { name: "Aarav Shrestha", company: "NirMix Premium" },
+    listedBy: {
+      type: "Agent",
+      name: "Aarav Shrestha",
+      company: "NirMix Premium",
+      phone: "+977 9801234567",
+      email: "aarav@nirmix.com.np",
+      verified: true,
+      listings: 24,
+    },
+    postedOn: "2026-06-20",
+    specs: [
+      { label: "Property type", value: "House · Villa" },
+      { label: "Bedrooms", value: "5" },
+      { label: "Bathrooms", value: "4" },
+      { label: "Plot area", value: "8 Aana" },
+      { label: "Built-up area", value: "4,200 sqft" },
+      { label: "Floors", value: "2.5" },
+      { label: "Facing", value: "East" },
+      { label: "Furnishing", value: "Semi-furnished" },
+      { label: "Parking", value: "2 Cars" },
+      { label: "Ownership", value: "Freehold (Lalpurja)" },
+      { label: "Road access", value: "20 ft Blacktopped" },
+      { label: "Year built", value: "2022" },
+    ],
+    amenities: [
+      "Power Backup",
+      "24x7 Water",
+      "Security / CCTV",
+      "Garden / Lawn",
+      "Solar Panel",
+      "Modular Kitchen",
+      "Covered Parking",
+      "Compound Wall",
+    ],
+    highlights: [
+      "Architect-designed with double-height living",
+      "Landscaped private garden",
+      "Smart-home automation throughout",
+      "Panoramic valley views",
+    ],
+    videoLink: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    floorPlan: {
+      url: "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=80",
+      name: "Villa-floor-plan.png",
+    },
+    coordinates: { lat: 27.6411, lng: 85.3089 },
+    wardNo: "5",
+    landmark: "Near Bhaisepati Chowk, opposite Civil Homes gate",
   },
   {
     id: "listing-rent-1",
@@ -233,6 +281,51 @@ export const listingProperties: Property[] = [
     description:
       "Fully furnished apartment with floor-to-ceiling windows, modular kitchen, rooftop garden access and dedicated parking.",
     agent: { name: "Sita Tamang", company: "Himalayan Realty" },
+    listedBy: {
+      type: "Personal",
+      name: "Sita Tamang",
+      phone: "+977 9847654321",
+      email: "sita.tamang@example.com",
+      verified: false,
+    },
+    postedOn: "2026-06-25",
+    specs: [
+      { label: "Property type", value: "Apartment · 3 BHK" },
+      { label: "Bedrooms", value: "3" },
+      { label: "Bathrooms", value: "2" },
+      { label: "Carpet area", value: "1,450 sqft" },
+      { label: "Floor", value: "7th of 12" },
+      { label: "Facing", value: "South-East" },
+      { label: "Furnishing", value: "Fully furnished" },
+      { label: "Parking", value: "1 Car · 1 Bike" },
+      { label: "Deposit", value: "2 months rent" },
+      { label: "Minimum lease", value: "1 year" },
+      { label: "Available from", value: "Immediately" },
+    ],
+    amenities: [
+      "Lift",
+      "Gym",
+      "Power Backup",
+      "CCTV",
+      "Rooftop Garden",
+      "Intercom",
+      "Reserved Parking",
+      "24x7 Water",
+    ],
+    highlights: [
+      "Floor-to-ceiling windows with hill views",
+      "Modular kitchen with chimney",
+      "Rooftop garden & lounge access",
+      "Dedicated covered parking",
+    ],
+    videoLink: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    floorPlan: {
+      url: "https://images.unsplash.com/photo-1503387762-592deb58ef4e?auto=format&fit=crop&w=1200&q=80",
+      name: "Apartment-3BHK-layout.png",
+    },
+    coordinates: { lat: 27.6792, lng: 85.3158 },
+    wardNo: "10",
+    landmark: "Kupondole Heights, near Hotel Himalaya",
   },
 ];
 
@@ -247,3 +340,7 @@ export const allProperties: Property[] = [
   ...dashboardFeedProperties,
   ...properties,
 ];
+
+export function getPropertyById(id: string): Property | undefined {
+  return allProperties.find((p) => p.id === id);
+}

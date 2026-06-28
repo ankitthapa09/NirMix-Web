@@ -260,7 +260,7 @@ export function PropertyListingPage({ mode, initialType, initialStatus }: Proper
           />
         </div>
 
-        <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[296px_minmax(0,1fr)] lg:gap-8">
+        <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[296px_1fr] lg:gap-8">
           <PropertyFilters
             mode={mode}
             filters={filters}
