@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Menu, Bell } from "lucide-react";
+import { Bell } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 interface DashboardNavbarProps {

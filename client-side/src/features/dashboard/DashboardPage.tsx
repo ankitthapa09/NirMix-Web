@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { WelcomeHeader } from "./components/WelcomeHeader";
 import { PropertyFeed } from "./components/PropertyFeed";
@@ -10,25 +9,19 @@ import { PropertyCreateWizard } from "./components/PropertyCreateWizard";
 export function DashboardPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [isWizardOpen, setIsWizardOpen] = useState(false);
 
-  useEffect(() => {
-    if (searchParams.get("create") === "true") {
-      setIsWizardOpen(true);
-    }
-  }, [searchParams]);
+  // The wizard's visibility lives entirely in the URL (?create=true), so we
+  // derive it rather than mirroring it into state — this also keeps it open
+  // across a refresh and avoids a setState-in-effect.
+  const isWizardOpen = searchParams.get("create") === "true";
 
   const handleOpenWizard = () => {
-    setIsWizardOpen(true);
-    // Push state to URL so refreshing keeps the wizard open, but doesn't cause a hard reload
     const params = new URLSearchParams(window.location.search);
     params.set("create", "true");
     router.replace(`/dashboard?${params.toString()}`);
   };
 
   const handleCloseWizard = () => {
-    setIsWizardOpen(false);
-    // Remove query param from URL
     const params = new URLSearchParams(window.location.search);
     params.delete("create");
     router.replace(`/dashboard${params.toString() ? `?${params.toString()}` : ""}`);

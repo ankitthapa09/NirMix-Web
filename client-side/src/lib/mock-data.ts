@@ -183,3 +183,67 @@ export const dashboardFeedProperties: Property[] = [
 export function getFeaturedProperties() {
   return properties.filter((p) => p.featured).slice(0, 4);
 }
+
+/* ── Buy / Rent listing pages — one premium mock listing each (for now) ── */
+
+export const listingProperties: Property[] = [
+  {
+    id: "listing-sale-1",
+    title: "Modern 5BHK Villa with Private Garden",
+    type: "House",
+    price: 42500000,
+    location: {
+      district: "Lalitpur",
+      city: "Lalitpur",
+      neighborhood: "Bhaisepati",
+    },
+    beds: 5,
+    baths: 4,
+    areaSqft: 8,
+    areaUnit: "Aana",
+    photos: [
+      "https://images.unsplash.com/photo-1613977257363-707ba9348227?auto=format&fit=crop&w=1000&q=80",
+    ],
+    status: "For Sale",
+    featured: true,
+    tag: "NEW",
+    description:
+      "Architect-designed villa with double-height living, landscaped garden, smart-home automation and panoramic valley views.",
+    agent: { name: "Aarav Shrestha", company: "NirMix Premium" },
+  },
+  {
+    id: "listing-rent-1",
+    title: "Furnished 3BHK Apartment with Hill View",
+    type: "Apartment",
+    price: 65000,
+    location: {
+      district: "Lalitpur",
+      city: "Lalitpur",
+      neighborhood: "Kupondole",
+    },
+    beds: 3,
+    baths: 2,
+    areaSqft: 1450,
+    photos: [
+      "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1000&q=80",
+    ],
+    status: "For Rent",
+    featured: true,
+    tag: "VERIFIED",
+    description:
+      "Fully furnished apartment with floor-to-ceiling windows, modular kitchen, rooftop garden access and dedicated parking.",
+    agent: { name: "Sita Tamang", company: "Himalayan Realty" },
+  },
+];
+
+export function getListingsByStatus(status: Property["status"]) {
+  return listingProperties.filter((p) => p.status === status);
+}
+
+/* ── All Property hub — every listing across the platform ── */
+
+export const allProperties: Property[] = [
+  ...listingProperties,
+  ...dashboardFeedProperties,
+  ...properties,
+];
