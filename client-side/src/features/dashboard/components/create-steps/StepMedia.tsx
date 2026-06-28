@@ -2,19 +2,16 @@
 
 import { useRef } from "react";
 import { Upload, X, Film, FileText } from "lucide-react";
+import { MediaItem, PropertyFormData, StepProps } from "./types";
 
-interface StepMediaProps {
-  formData: any;
-  onChange: (data: any) => void;
-  errors: Record<string, string>;
-}
+type StepMediaProps = StepProps;
 
 export function StepMedia({ formData, onChange, errors }: StepMediaProps) {
   const { photos = [], videoLink = "", floorPlan = null } = formData;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const floorPlanInputRef = useRef<HTMLInputElement>(null);
 
-  const handleUpdate = (fields: any) => {
+  const handleUpdate = (fields: Partial<PropertyFormData>) => {
     onChange({ ...formData, ...fields });
   };
 
@@ -82,30 +79,31 @@ export function StepMedia({ formData, onChange, errors }: StepMediaProps) {
     <div className="space-y-6">
       {/* Photo Uploader */}
       <div>
-        <label className="block text-sm font-bold text-[#342417] mb-3">
-          Upload Property Photos
-        </label>
-        
+        <label className="nm-label">Upload Property Photos</label>
+
         {/* Drop zone / main trigger */}
         {photos.length === 0 ? (
           <div
             onClick={triggerPhotoSelect}
-            className="w-full h-56 rounded-2xl border-2 border-dashed border-[#E0D4C5] bg-[#F5EFE6]/40 hover:bg-[#F5EFE6]/70 transition-all duration-300 flex flex-col items-center justify-center cursor-pointer group"
+            className="nm-recessed w-full h-56 flex flex-col items-center justify-center cursor-pointer group"
           >
-            <div className="p-4 rounded-full bg-[#E0B33A]/10 text-[#E0B33A] mb-3 group-hover:scale-110 transition-transform duration-300">
+            <div
+              className="p-4 rounded-full mb-3 group-hover:scale-110 transition-transform duration-300"
+              style={{ backgroundColor: "var(--nm-accent-soft)", color: "var(--nm-accent)" }}
+            >
               <Upload className="h-6 w-6" />
             </div>
             <span className="text-sm font-bold text-[#342417]">
               Drag & Drop files or Click to Browse
             </span>
-            <span className="text-xs text-[#342417]/50 mt-1">
+            <span className="text-xs text-[#342417]/55 mt-1">
               Supports JPEG, PNG up to 10MB each. Upload at least 3 photos for best engagement.
             </span>
           </div>
         ) : (
           /* Grid of uploaded images */
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            {photos.map((photo: any, index: number) => (
+            {photos.map((photo: MediaItem, index: number) => (
               <div
                 key={index}
                 className="relative aspect-video rounded-xl overflow-hidden border border-[#E0D4C5] bg-white group shadow-sm"
@@ -118,7 +116,10 @@ export function StepMedia({ formData, onChange, errors }: StepMediaProps) {
                 
                 {/* Cover badge for first image */}
                 {index === 0 && (
-                  <span className="absolute top-2 left-2 px-2.5 py-1 text-[9px] font-extrabold uppercase bg-[#E0B33A] text-[#342417] rounded-md tracking-wider shadow-sm z-10">
+                  <span
+                    className="absolute top-2 left-2 px-2.5 py-1 text-[9px] font-extrabold uppercase text-[#342417] rounded-md tracking-wider shadow-sm z-10"
+                    style={{ backgroundColor: "var(--nm-accent)" }}
+                  >
                     Cover
                   </span>
                 )}
@@ -139,7 +140,7 @@ export function StepMedia({ formData, onChange, errors }: StepMediaProps) {
             <button
               type="button"
               onClick={triggerPhotoSelect}
-              className="flex flex-col items-center justify-center aspect-video rounded-xl border-2 border-dashed border-[#E0D4C5] bg-white/40 hover:bg-white/80 hover:border-[#342417]/40 transition-all duration-200 cursor-pointer"
+              className="nm-tile flex flex-col items-center justify-center aspect-video cursor-pointer"
             >
               <Upload className="h-5 w-5 text-[#342417]/60 mb-1" />
               <span className="text-xs font-bold text-[#342417]/70">Add More</span>
@@ -162,7 +163,7 @@ export function StepMedia({ formData, onChange, errors }: StepMediaProps) {
 
       {/* Video Tour Link */}
       <div>
-        <label htmlFor="video-link" className="block text-sm font-bold text-[#342417] mb-2 flex items-center gap-1.5">
+        <label htmlFor="video-link" className="nm-label flex items-center gap-1.5">
           <Film className="h-4 w-4 text-[#342417]/70" />
           Video Tour Link (YouTube or Vimeo)
         </label>
@@ -172,21 +173,24 @@ export function StepMedia({ formData, onChange, errors }: StepMediaProps) {
           value={videoLink}
           onChange={(e) => handleUpdate({ videoLink: e.target.value })}
           placeholder="e.g. https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-          className="w-full px-4 py-3 rounded-xl border border-[#E0D4C5] bg-white/60 focus:bg-white focus:outline-none focus:border-[#E0B33A] focus:ring-1 focus:ring-[#E0B33A] text-sm text-[#342417] placeholder-[#342417]/40 transition-all font-medium"
+          className="nm-input px-4 py-3 text-xs font-semibold"
         />
       </div>
 
       {/* Floor Plan */}
       <div>
-        <label className="block text-sm font-bold text-[#342417] mb-2 flex items-center gap-1.5">
+        <label className="nm-label flex items-center gap-1.5">
           <FileText className="h-4 w-4 text-[#342417]/70" />
           Floor Plan (Optional)
         </label>
 
         {floorPlan ? (
-          <div className="flex items-center justify-between p-3.5 rounded-xl border border-[#E0D4C5] bg-white shadow-sm">
+          <div className="nm-panel flex items-center justify-between p-3.5">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-lg bg-[#E0B33A]/10 text-[#E0B33A]">
+              <div
+                className="p-2.5 rounded-lg"
+                style={{ backgroundColor: "var(--nm-accent-soft)", color: "var(--nm-accent)" }}
+              >
                 <FileText className="h-5 w-5" />
               </div>
               <div className="min-w-0">
@@ -208,9 +212,9 @@ export function StepMedia({ formData, onChange, errors }: StepMediaProps) {
         ) : (
           <div
             onClick={triggerFloorPlanSelect}
-            className="flex items-center gap-3 p-4 rounded-xl border border-dashed border-[#E0D4C5] bg-white/40 hover:bg-white/80 transition-colors cursor-pointer"
+            className="nm-tile flex items-center gap-3 p-4 cursor-pointer"
           >
-            <div className="p-2.5 rounded-lg bg-[#F5EFE6] text-[#342417]/60">
+            <div className="p-2.5 rounded-lg bg-[#EBDDC0] text-[#342417]/60">
               <Upload className="h-4 w-4" />
             </div>
             <div>

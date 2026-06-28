@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, FileCheck, CheckCircle2, ArrowRight, Loader2, Home, Trash2 } from "lucide-react";
+import { CheckCircle2, ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { StepBasics } from "./create-steps/StepBasics";
@@ -10,6 +9,7 @@ import { StepLocation } from "./create-steps/StepLocation";
 import { StepDetails } from "./create-steps/StepDetails";
 import { StepMedia } from "./create-steps/StepMedia";
 import { StepReview } from "./create-steps/StepReview";
+import { PropertyFormData, MediaItem, isMediaItem } from "./create-steps/types";
 
 const STEPS = [
   { label: "Basics", desc: "Type & Description" },
@@ -50,6 +50,8 @@ const INITIAL_FORM_STATE = {
   facing: "",
   furnishing: "",
   leaseTerm: "",
+  minLease: "",
+  availableFrom: "",
   zoning: "",
   roadSize: "",
   frontage: "",
@@ -64,8 +66,9 @@ const INITIAL_FORM_STATE = {
   termsAccepted: false,
 };
 
-const sanitizeData = (data: any) => {
-  if (!data || typeof data !== "object") return INITIAL_FORM_STATE;
+const sanitizeData = (input: unknown): PropertyFormData => {
+  if (!input || typeof input !== "object") return INITIAL_FORM_STATE;
+  const data = input as Record<string, unknown>;
 
   return {
     listingType: typeof data.listingType === "string" ? data.listingType : "For Sale",
@@ -98,6 +101,8 @@ const sanitizeData = (data: any) => {
     facing: typeof data.facing === "string" ? data.facing : "",
     furnishing: typeof data.furnishing === "string" ? data.furnishing : "",
     leaseTerm: typeof data.leaseTerm === "string" || typeof data.leaseTerm === "number" ? String(data.leaseTerm) : "",
+    minLease: typeof data.minLease === "string" || typeof data.minLease === "number" ? String(data.minLease) : "",
+    availableFrom: typeof data.availableFrom === "string" ? data.availableFrom : "",
     zoning: typeof data.zoning === "string" ? data.zoning : "",
     roadSize: typeof data.roadSize === "string" || typeof data.roadSize === "number" ? String(data.roadSize) : "",
     frontage: typeof data.frontage === "string" || typeof data.frontage === "number" ? String(data.frontage) : "",
@@ -106,9 +111,9 @@ const sanitizeData = (data: any) => {
     floorLevel: typeof data.floorLevel === "string" || typeof data.floorLevel === "number" ? String(data.floorLevel) : "",
     sharedFacilities: Array.isArray(data.sharedFacilities) ? data.sharedFacilities : [],
     amenities: Array.isArray(data.amenities) ? data.amenities : [],
-    photos: Array.isArray(data.photos) ? data.photos.filter((p: any) => p && typeof p.url === "string") : [],
+    photos: Array.isArray(data.photos) ? data.photos.filter(isMediaItem) : [],
     videoLink: typeof data.videoLink === "string" ? data.videoLink : "",
-    floorPlan: data.floorPlan && typeof data.floorPlan.url === "string" ? data.floorPlan : null,
+    floorPlan: isMediaItem(data.floorPlan) ? data.floorPlan : null,
     termsAccepted: !!data.termsAccepted,
   };
 };
@@ -119,15 +124,15 @@ interface PropertyCreateWizardProps {
 }
 
 export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardProps) {
-  const router = useRouter();
   const [activeStep, setActiveStep] = useState(0);
-  const [formData, setFormData] = useState<any>(INITIAL_FORM_STATE);
+  const [formData, setFormData] = useState<PropertyFormData>(INITIAL_FORM_STATE);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
+  const [, setDraftSavedAt] = useState<string | null>(null);
 
-  // Load draft from localStorage on mount
+  // Load draft from localStorage on mount — one-time sync from an external store
+  // into React state, so a direct setState here is intentional.
   useEffect(() => {
     if (isOpen) {
       const savedDraft = localStorage.getItem("nirmix_property_draft");
@@ -135,6 +140,7 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
         try {
           const parsed = JSON.parse(savedDraft);
           const sanitized = sanitizeData(parsed);
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           setFormData(sanitized);
           toast.info("Restored property draft.");
         } catch (e) {
@@ -156,13 +162,13 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
     };
   }, [isOpen]);
 
-  const saveDraft = (data: any) => {
+  const saveDraft = (data: PropertyFormData) => {
     try {
-      const dataToSave = { ...data };
-      if (dataToSave.photos) {
-        dataToSave.photos = dataToSave.photos.map((p: any) => ({ url: p.url, name: p.name }));
+      const dataToSave: Record<string, unknown> = { ...data };
+      if (Array.isArray(dataToSave.photos)) {
+        dataToSave.photos = (dataToSave.photos as MediaItem[]).map((p) => ({ url: p.url, name: p.name }));
       }
-      if (dataToSave.floorPlan) {
+      if (isMediaItem(dataToSave.floorPlan)) {
         dataToSave.floorPlan = { url: dataToSave.floorPlan.url, name: dataToSave.floorPlan.name };
       }
       localStorage.setItem("nirmix_property_draft", JSON.stringify(dataToSave));
@@ -184,7 +190,7 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
     setIsSuccess(false);
   };
 
-  const handleFormChange = (updatedData: any) => {
+  const handleFormChange = (updatedData: Partial<PropertyFormData>) => {
     const nextData = { ...formData, ...updatedData };
     setFormData(nextData);
     saveDraft(nextData);
@@ -214,26 +220,8 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
     }
 
     if (step === 2) {
-      if (!formData.price || Number(formData.price) <= 0) {
-        stepErrors.price = "A valid positive price is required.";
-      }
-
-      if (formData.propertyType === "House" || formData.propertyType === "Apartment") {
-        if (!formData.beds || Number(formData.beds) <= 0) {
-          stepErrors.beds = "Number of bedrooms is required.";
-        }
-        if (!formData.baths || Number(formData.baths) <= 0) {
-          stepErrors.baths = "Number of bathrooms is required.";
-        }
-        if (!formData.builtUpArea || Number(formData.builtUpArea) <= 0) {
-          stepErrors.builtUpArea = "Built-up area is required.";
-        }
-      }
-
-      if (formData.propertyType === "Land") {
-        if (!formData.landArea || Number(formData.landArea) <= 0) {
-          stepErrors.landArea = "Land area (Aana) is required.";
-        }
+      if (formData.isDetailsValid === false) {
+        stepErrors.details = "Please fill in all required fields.";
       }
     }
 
@@ -348,15 +336,9 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
 
   if (!isOpen) return null;
 
-  const getBackgroundImage = () => {
-    if (formData.propertyType === "Apartment") {
-      return "/images/hero-house.png";
-    }
-    if (formData.propertyType === "Land") {
-      return "/images/land-bg.jpg";
-    }
-    return "/images/about-house.png";
-  };
+  // Accent flips between sale (warm gold) and rent (green); engraved styles read these.
+  const isRent = formData.listingType === "For Rent";
+  const primaryTextClass = isRent ? "text-white" : "text-[#342417]";
 
   const getStepHeader = () => {
     switch (activeStep) {
@@ -394,14 +376,141 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
   const { title: stepTitle, desc: stepDesc } = getStepHeader();
 
   return (
-    <div className="fixed inset-0 z-[100] w-full h-full flex items-center justify-center bg-[#EAE2D8]/30 backdrop-blur-md p-3 sm:p-6 overflow-hidden select-none">
-      {/* Fixed background image - does not scroll */}
-      <div
-        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat pointer-events-none scale-105 filter blur-[6px] opacity-45"
-        style={{ backgroundImage: `url('${getBackgroundImage()}')` }}
-      />
-      {/* Light beige warm tint overlay */}
-      <div className="absolute inset-0 z-0 bg-[#FAF7F2]/40 mix-blend-multiply pointer-events-none" />
+    <div
+      className="nm-board fixed inset-0 z-[100] w-full h-full flex items-center justify-center p-3 sm:p-6 overflow-hidden select-none"
+      style={{
+        "--nm-accent": isRent ? "#3F8F4E" : "#B98A2E",
+        "--nm-accent-soft": isRent ? "rgba(63,143,78,0.15)" : "rgba(185,138,46,0.18)",
+        "--nm-accent-ring": isRent ? "rgba(63,143,78,0.28)" : "rgba(185,138,46,0.32)",
+      } as React.CSSProperties}
+    >
+      {/* Soft vignette to draw the eye to the board centre */}
+      <div className="absolute inset-0 z-0 pointer-events-none bg-[radial-gradient(130%_110%_at_50%_-10%,transparent_55%,rgba(74,52,28,0.30))]" />
+
+      {/* Tactile "paper board with engraved content" design system — shared by every step */}
+      <style jsx global>{`
+        /* Warm plaster wall: fine grain + coarse mottling, lit softly from the top */
+        .nm-board {
+          background-color: #E4D8C0;
+          background-image:
+            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.6'/%3E%3C/svg%3E"),
+            url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.016' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)' opacity='0.55'/%3E%3C/svg%3E"),
+            radial-gradient(130% 110% at 50% 0%, rgba(255,250,240,0.55), rgba(120,90,55,0.20));
+          background-size: 180px 180px, 600px 600px, 100% 100%;
+          background-blend-mode: soft-light, soft-light, normal;
+        }
+        .nm-recessed {
+          background-color: #F4ECD9;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
+          background-size: 200px 200px;
+          border: 1px solid rgba(120,90,55,0.28);
+          border-radius: 24px;
+          box-shadow:
+            inset 0 3px 8px rgba(90,66,38,0.20),
+            inset 0 -1px 0 rgba(255,255,255,0.7),
+            0 1px 0 rgba(255,255,255,0.5);
+        }
+        .nm-stepper {
+          border-radius: 9999px;
+          background-color: #E1CFAE;
+          box-shadow:
+            inset 0 2px 5px rgba(90,66,38,0.25),
+            inset 0 -1px 0 rgba(255,255,255,0.55);
+        }
+        .nm-pip {
+          background-color: #EBDDC0;
+          box-shadow: inset 0 1px 3px rgba(90,66,38,0.25), inset 0 -1px 0 rgba(255,255,255,0.5);
+        }
+        .nm-track {
+          background-color: #E1CFAE;
+          box-shadow: inset 0 1px 2px rgba(90,66,38,0.30);
+        }
+        .nm-label {
+          display: block;
+          font-size: 12px;
+          font-weight: 700;
+          letter-spacing: 0.01em;
+          color: #5C4D3C;
+          text-shadow: 0 1px 0 rgba(255,255,255,0.6);
+          margin-bottom: 8px;
+        }
+        .nm-input {
+          width: 100%;
+          background-color: #ECE0C7;
+          border: 1px solid rgba(120,90,55,0.22);
+          border-radius: 12px;
+          color: #342417;
+          box-shadow: inset 0 2px 4px rgba(90,66,38,0.16), inset 0 -1px 0 rgba(255,255,255,0.55);
+          transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease;
+        }
+        .nm-input::placeholder { color: rgba(52,36,23,0.40); }
+        .nm-input:hover { background-color: #EFE6D1; }
+        .nm-input:focus {
+          outline: none;
+          background-color: #FBF6EA;
+          border-color: var(--nm-accent);
+          box-shadow: inset 0 1px 2px rgba(90,66,38,0.10), 0 0 0 3px var(--nm-accent-ring);
+        }
+        .nm-input:disabled { opacity: .55; cursor: not-allowed; }
+        .nm-tile {
+          background-color: #EFE6CF;
+          border: 1px solid rgba(120,90,55,0.20);
+          border-radius: 14px;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), 0 1px 2px rgba(90,66,38,0.08);
+          transition: all .2s ease;
+        }
+        .nm-tile:hover { background-color: #F4EDDA; box-shadow: 0 5px 12px rgba(90,66,38,0.14); }
+        .nm-tile.is-selected {
+          background-color: var(--nm-accent-soft);
+          border-color: var(--nm-accent);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), 0 6px 14px rgba(90,66,38,0.20);
+          transform: translateY(-1px);
+        }
+        .nm-chip {
+          background-color: #EFE6CF;
+          border: 1px solid rgba(120,90,55,0.20);
+          border-radius: 9999px;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.5);
+          transition: all .18s ease;
+        }
+        .nm-chip:hover { background-color: #F4EDDA; }
+        .nm-chip.is-selected {
+          background-color: var(--nm-accent-soft);
+          border-color: var(--nm-accent);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), 0 3px 8px rgba(90,66,38,0.16);
+        }
+        .nm-panel {
+          background-color: #FBF6EA;
+          border: 1px solid rgba(120,90,55,0.18);
+          border-radius: 16px;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.7), 0 2px 6px rgba(90,66,38,0.07);
+        }
+        .nm-btn {
+          border-radius: 12px;
+          border: 1px solid rgba(120,90,55,0.18);
+          transition: transform .12s ease, box-shadow .12s ease, background-color .15s ease, filter .15s ease;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), 0 3px 0 rgba(120,90,55,0.30), 0 6px 12px rgba(90,66,38,0.16);
+        }
+        .nm-btn:hover { filter: brightness(1.03); }
+        .nm-btn:active {
+          transform: translateY(2px);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 1px 0 rgba(120,90,55,0.30), 0 3px 6px rgba(90,66,38,0.12);
+        }
+        .nm-btn:disabled { transform: none; filter: none; }
+        .nm-btn-primary { border-color: rgba(0,0,0,0.06); }
+        .nm-btn-paper { background-color: #F1E7D2; }
+        .nm-btn-amber { background-color: #EBC55A; }
+        .nm-btn-danger {
+          background-color: #E0573F;
+          border-color: rgba(120,40,20,0.25);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 3px 0 rgba(150,40,20,0.35), 0 6px 12px rgba(150,40,20,0.20);
+        }
+        .nm-btn-dark {
+          background-color: #3A2A1A;
+          border-color: rgba(0,0,0,0.25);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 3px 0 rgba(20,12,6,0.5), 0 6px 12px rgba(20,12,6,0.25);
+        }
+      `}</style>
 
       <div className="relative z-10 w-full max-w-[1300px] h-full max-h-[85vh] md:max-h-[88vh] flex flex-col justify-between">
         {/* Desktop-only Header Section */}
@@ -440,7 +549,7 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
               <button
                 type="button"
                 onClick={handleBack}
-                className="w-full flex items-center justify-center gap-1.5 px-5 py-2.5 bg-[#E5C158]/55 hover:bg-[#E5C158]/70 border border-[#A57C52]/30 text-xs font-bold text-[#342417] rounded-xl transition-all cursor-pointer shadow-md"
+                className="nm-btn nm-btn-paper w-full flex items-center justify-center gap-1.5 px-5 py-2.5 text-xs font-bold text-[#342417] cursor-pointer"
               >
                 ← Back
               </button>
@@ -468,14 +577,14 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
                       toast.success("Draft saved successfully.");
                       onClose();
                     }}
-                    className="px-3 py-1.5 bg-[#F2C94C] hover:bg-[#E5C158] text-[#342417] text-[10px] font-bold rounded-lg transition-all shadow-sm cursor-pointer"
+                    className="nm-btn nm-btn-amber px-3 py-1.5 text-[#342417] text-[10px] font-bold cursor-pointer"
                   >
                     Save Draft
                   </button>
                   <button
                     type="button"
                     onClick={handleCancel}
-                    className="px-3 py-1.5 bg-[#EF4444] hover:bg-[#DC2626] text-white text-[10px] font-bold rounded-lg transition-all shadow-sm cursor-pointer"
+                    className="nm-btn nm-btn-danger px-3 py-1.5 text-white text-[10px] font-bold cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -497,29 +606,32 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
 
             {/* Stepper progress indicator */}
             <div className="mb-3 shrink-0 flex justify-start pl-2 max-w-full overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-              <div className="flex items-center gap-1.5 sm:gap-2 px-4 py-2 rounded-full bg-[#854A22]/45 border border-[#A57C52]/20 backdrop-blur-md whitespace-nowrap">
+              <div className="nm-stepper flex items-center gap-1.5 sm:gap-6 px-4 py-2 whitespace-nowrap">
                 {STEPS.map((step, index) => {
                   const isCompleted = activeStep > index;
                   const isActive = activeStep === index;
                   return (
                     <div key={step.label} className="flex items-center">
                       {index > 0 && (
-                        <div className={`w-3 sm:w-6 h-[1.5px] mx-1 sm:mx-1.5 ${isCompleted ? "bg-[#E5C158]" : "bg-[#342417]/20"}`} />
+                        <div className={`w-3 sm:w-6 h-[1.5px] mx-1 sm:mx-1.5 ${isCompleted ? "bg-[#27AE60]" : "bg-[#5C4D3C]/20"}`} />
                       )}
                       <button
                         type="button"
                         onClick={() => handleGoToStep(index)}
-                        className="flex items-center gap-1 cursor-pointer focus:outline-none"
+                        className="flex items-center gap-2.5 cursor-pointer focus:outline-none"
                       >
-                        <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center text-[8px] sm:text-[9px] font-extrabold transition-all duration-300 ${isCompleted
-                          ? "bg-[#27AE60] text-white"
-                          : isActive
-                            ? "bg-[#E5C158] text-[#342417] ring-2 ring-[#E5C158]/20"
-                            : "bg-white/40 text-[#342417]/60"
-                        }`}>
+                        <div
+                          className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center text-[8px] sm:text-[9px] font-extrabold transition-all duration-300 ${isCompleted
+                            ? "bg-[#27AE60] text-white shadow-[0_2px_4px_rgba(39,174,96,0.35)]"
+                            : isActive
+                              ? "text-[#342417] shadow-[inset_0_1px_0_rgba(255,255,255,0.6),0_3px_8px_rgba(90,66,38,0.25)]"
+                              : "nm-pip text-[#5C4D3C]/60"
+                            }`}
+                          style={isActive ? { backgroundColor: "var(--nm-accent)" } : undefined}
+                        >
                           {isCompleted ? "✓" : index + 1}
                         </div>
-                        <span className={`text-[9px] sm:text-[10px] font-extrabold tracking-wide transition-colors ${isActive ? "text-[#342417]" : "text-[#342417]/50"
+                        <span className={`text-[9px] sm:text-[10px] font-extrabold tracking-wide transition-colors ${isActive ? "text-[#342417]" : "text-[#342417]/45"
                           }`}>
                           {step.label}
                         </span>
@@ -531,7 +643,7 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
             </div>
 
             {/* Main Card Container */}
-            <div className="flex-1 min-h-0 bg-[#EADDC9]/60 backdrop-blur-xl border-2 border-[#A57C52]/50 shadow-2xl p-4 sm:p-6 rounded-[20px] sm:rounded-[24px] flex flex-col relative overflow-hidden mb-2 md:mb-3">
+            <div className="nm-recessed flex-1 min-h-0 p-4 sm:p-6 flex flex-col relative overflow-hidden mb-2 md:mb-3">
               {isSuccess ? (
                 <div className="text-center flex flex-col items-center justify-center py-6 sm:py-8 flex-1">
                   <div className="p-3 sm:p-4 rounded-full bg-emerald-500/10 text-emerald-500 mb-4 sm:mb-6 animate-bounce">
@@ -543,7 +655,7 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
                   </h2>
 
                   <p className="text-sm sm:text-base text-[#342417]/70 max-w-md mb-6 sm:mb-8 leading-relaxed font-medium">
-                    Your listing <span className="font-bold text-[#342417]">"{formData.title}"</span> is now live. Buyers and renters can discover and view your listing details.
+                    Your listing <span className="font-bold text-[#342417]">&quot;{formData.title}&quot;</span> is now live. Buyers and renters can discover and view your listing details.
                   </p>
 
                   <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full justify-center">
@@ -552,7 +664,7 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
                         resetWizard();
                         onClose();
                       }}
-                      className="px-6 py-3 bg-[#342417] text-white hover:bg-[#251910] text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+                      className="nm-btn nm-btn-dark px-6 py-3 text-white text-xs sm:text-sm font-bold cursor-pointer flex items-center justify-center gap-2"
                     >
                       Go to Dashboard
                     </button>
@@ -561,7 +673,7 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
                       onClick={() => {
                         resetWizard();
                       }}
-                      className="px-6 py-3 bg-white border border-[#E0D4C5] hover:bg-[#F5EFE6] text-xs sm:text-sm font-bold text-[#342417] rounded-xl transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2"
+                      className="nm-btn nm-btn-paper px-6 py-3 text-xs sm:text-sm font-bold text-[#342417] cursor-pointer flex items-center justify-center gap-2"
                     >
                       Post Another Property
                       <ArrowRight className="h-4 w-4" />
@@ -571,14 +683,34 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
               ) : (
                 <div className="flex-1 flex flex-col min-h-0">
                   {/* Step Sub-Header inside Card */}
-                  <div className="border-b border-[#A57C52]/30 pb-3 mb-4 sm:mb-5 shrink-0">
-                    <h2 className="text-base sm:text-lg font-extrabold text-[#342417]">
-                      {stepTitle}
-                    </h2>
-                    {stepDesc && (
-                      <p className="text-[11px] sm:text-xs text-[#5C4D3C]/75 mt-0.5 font-medium">
-                        {stepDesc}
-                      </p>
+                  <div className="border-b border-[#A57C52]/30 pb-3 mb-4 sm:mb-5 shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div>
+                      <h2 className="text-base sm:text-lg font-extrabold text-[#342417]">
+                        {stepTitle}
+                      </h2>
+                      {stepDesc && (
+                        <p className="text-[11px] sm:text-xs text-[#5C4D3C]/75 mt-0.5 font-medium">
+                          {stepDesc}
+                        </p>
+                      )}
+                    </div>
+                    {/* Completion bar aligned horizontally */}
+                    {activeStep === 2 && formData.detailsCompletion !== undefined && (
+                      <div className="nm-chip flex items-center gap-2 px-3 py-1 shrink-0 self-start sm:self-auto">
+                        <span className="text-[9px] text-[#5C4D3C] font-extrabold uppercase tracking-wider">Completion:</span>
+                        <div className="nm-track w-16 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className={`h-full transition-all duration-500 rounded-full ${formData.detailsCompletion === 100
+                              ? "bg-emerald-500"
+                              : formData.listingType === "For Rent"
+                                ? "bg-[#24A148]"
+                                : "bg-[#E5C158]"
+                              }`}
+                            style={{ width: `${formData.detailsCompletion || 0}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] font-black text-[#342417]">{formData.detailsCompletion || 0}%</span>
+                      </div>
                     )}
                   </div>
 
@@ -597,7 +729,7 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
                 <button
                   type="button"
                   onClick={handleBack}
-                  className="flex-1 py-2.5 bg-[#E5C158]/55 hover:bg-[#E5C158]/70 border border-[#A57C52]/30 text-xs font-bold text-[#342417] rounded-xl transition-all cursor-pointer shadow-md text-center"
+                  className="nm-btn nm-btn-paper flex-1 py-2.5 text-xs font-bold text-[#342417] cursor-pointer text-center"
                 >
                   ← Back
                 </button>
@@ -611,7 +743,9 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
                   <button
                     type="button"
                     onClick={handleNext}
-                    className="flex-1 py-2.5 bg-[#E5C158] hover:bg-[#C29624] text-[#342417] text-xs font-bold rounded-xl transition-all cursor-pointer shadow-md text-center"
+                    disabled={activeStep === 2 && formData.isDetailsValid === false}
+                    style={{ backgroundColor: "var(--nm-accent)" }}
+                    className={`nm-btn nm-btn-primary flex-1 py-2.5 ${primaryTextClass} text-xs font-bold cursor-pointer text-center disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none`}
                   >
                     Continue →
                   </button>
@@ -620,11 +754,12 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
                     type="button"
                     onClick={handlePublish}
                     disabled={isSubmitting}
-                    className="flex-1 py-2.5 bg-[#E5C158] hover:bg-[#C29624] text-[#342417] text-xs font-extrabold rounded-xl transition-all cursor-pointer shadow-md disabled:opacity-75 text-center flex items-center justify-center gap-1.5"
+                    style={{ backgroundColor: "var(--nm-accent)" }}
+                    className={`nm-btn nm-btn-primary flex-1 py-2.5 ${primaryTextClass} text-xs font-extrabold cursor-pointer disabled:opacity-75 text-center flex items-center justify-center gap-1.5`}
                   >
                     {isSubmitting ? (
                       <>
-                        <Loader2 className="h-3 w-3 animate-spin text-[#342417]" />
+                        <Loader2 className={`h-3 w-3 animate-spin ${primaryTextClass}`} />
                         Publishing...
                       </>
                     ) : (
@@ -650,14 +785,14 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
                     toast.success("Draft saved successfully.");
                     onClose();
                   }}
-                  className="w-full px-5 py-2.5 bg-[#F2C94C] hover:bg-[#E5C158] text-[#342417] text-xs font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="nm-btn nm-btn-amber w-full px-5 py-2.5 text-[#342417] text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   Save as Draft →
                 </button>
                 <button
                   type="button"
                   onClick={handleCancel}
-                  className="w-fit px-5 py-2.5 bg-[#EF4444] hover:bg-[#DC2626] text-white text-xs font-bold rounded-xl transition-all shadow-[0_4px_14px_rgba(239,68,68,0.35)] flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="nm-btn nm-btn-danger w-fit px-5 py-2.5 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   Cancel ☒
                 </button>
@@ -671,7 +806,9 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
                   <button
                     type="button"
                     onClick={handleNext}
-                    className="w-full flex items-center justify-center gap-1.5 px-6 py-2.5 bg-[#E5C158] hover:bg-[#C29624] text-[#342417] text-xs font-bold rounded-xl transition-all cursor-pointer shadow-md"
+                    disabled={activeStep === 2 && formData.isDetailsValid === false}
+                    style={{ backgroundColor: "var(--nm-accent)" }}
+                    className={`nm-btn nm-btn-primary w-full flex items-center justify-center gap-1.5 px-6 py-2.5 ${primaryTextClass} text-xs font-bold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none`}
                   >
                     Continue →
                   </button>
@@ -680,11 +817,12 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
                     type="button"
                     onClick={handlePublish}
                     disabled={isSubmitting}
-                    className="w-full flex items-center justify-center gap-1.5 px-6 py-2.5 bg-[#E5C158] hover:bg-[#C29624] text-[#342417] text-xs font-extrabold rounded-xl transition-all cursor-pointer shadow-md disabled:opacity-75"
+                    style={{ backgroundColor: "var(--nm-accent)" }}
+                    className={`nm-btn nm-btn-primary w-full flex items-center justify-center gap-1.5 px-6 py-2.5 ${primaryTextClass} text-xs font-extrabold cursor-pointer disabled:opacity-75`}
                   >
                     {isSubmitting ? (
                       <>
-                        <Loader2 className="h-3.5 w-3.5 animate-spin text-[#342417]" />
+                        <Loader2 className={`h-3.5 w-3.5 animate-spin ${primaryTextClass}`} />
                         Publishing...
                       </>
                     ) : (
@@ -698,7 +836,7 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
             </div>
           </div>
         </div>
-        </div>
       </div>
+    </div>
   );
 }
