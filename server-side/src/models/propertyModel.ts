@@ -2,6 +2,7 @@ import mongoose, { Document, Schema, Types } from 'mongoose';
 import { LISTING_TYPES, PROPERTY_TYPES, IPropertyMedia } from '../types/property.types.js';
 
 export interface IProperty extends Document {
+  referenceId: string;
   owner: Types.ObjectId;
   listingType: string;
   propertyType: string;
@@ -36,6 +37,12 @@ const mediaSchema = new Schema<IPropertyMedia>(
 
 const propertySchema = new Schema<IProperty>(
   {
+    referenceId: {
+      type: String,
+      required: [true, 'Reference ID is required'],
+      unique: true,
+      index: true,
+    },
     owner: {
       type: Schema.Types.ObjectId,
       ref: 'User',

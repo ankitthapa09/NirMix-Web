@@ -34,6 +34,36 @@ export const createPropertySchema = z.object({
 
 export type CreatePropertyInput = z.infer<typeof createPropertySchema>;
 
+// ── Human-readable reference code, e.g. "SALE-LAND-0001" ──
+export const LISTING_CODES: Record<ListingType, string> = {
+  'For Sale': 'SALE',
+  'For Rent': 'RENT',
+};
+
+export const CATEGORY_CODES: Record<PropertyTypeValue, string> = {
+  House: 'HOUSE',
+  Apartment: 'APT',
+  Land: 'LAND',
+  Room: 'ROOM',
+  Flats: 'FLAT',
+  'Office Space': 'OFFICE',
+  'Shop Space': 'SHOP',
+};
+
+/** Counter key for a listing+category combination, e.g. "SALE-LAND". */
+export function referenceKey(listingType: ListingType, propertyType: PropertyTypeValue): string {
+  return `${LISTING_CODES[listingType]}-${CATEGORY_CODES[propertyType]}`;
+}
+
+/** Reference code from the combination + sequence, e.g. "SALE-LAND-0001". */
+export function buildReferenceId(
+  listingType: ListingType,
+  propertyType: PropertyTypeValue,
+  seq: number
+): string {
+  return `${referenceKey(listingType, propertyType)}-${String(seq).padStart(4, '0')}`;
+}
+
 // Uploaded media references stored in MongoDB (Cloudinary URL + delete handle).
 export interface IPropertyMedia {
   url: string;

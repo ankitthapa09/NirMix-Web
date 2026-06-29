@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { connectDB } from './src/config/db.js';
 import authRoutes from './src/routes/auth.routes.js';
+import propertyRoutes from './src/routes/property.routes.js';
 import { errorHandler, notFoundHandler } from './src/middlewares/error.middleware.js';
 import 'dotenv/config';
 
@@ -31,6 +32,9 @@ app.get('/api/health', (req, res) => {
 
 // Auth Routes
 app.use('/api/auth', authRoutes);
+
+// Property Routes
+app.use('/api/properties', propertyRoutes);
 
 // ERROR HANDLING 
 
