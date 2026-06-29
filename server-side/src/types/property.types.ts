@@ -25,7 +25,7 @@ export const createPropertySchema = z.object({
   }),
 
   price: z.coerce.number().positive(),
-  videoLink: z.union([z.string().url(), z.literal('')]).optional().default(''),
+  videoLink: z.union([z.url(), z.literal('')]).optional().default(''),
 
   // Everything type-specific (ownership, deposit, beds, baths, landArea, amenities,
   // houseType, bhkType, plotType, reraRegistered, …) lives here, untyped-but-stored.

@@ -10,6 +10,7 @@ import { StepDetails } from "./create-steps/StepDetails";
 import { StepMedia } from "./create-steps/StepMedia";
 import { StepReview } from "./create-steps/StepReview";
 import { PropertyFormData, MediaItem, isMediaItem } from "./create-steps/types";
+import { useAuth } from "@/lib/auth-context";
 
 const STEPS = [
   { label: "Basics", desc: "Type & Description" },
@@ -118,6 +119,44 @@ const sanitizeData = (input: unknown): PropertyFormData => {
   };
 };
 
+const API_BASE = "http://localhost:5001/api";
+
+// Fields sent top-level / handled separately; everything else on the wizard's flat
+// formData is bundled into `details` to match the API's create contract.
+const TOP_LEVEL_FIELDS = new Set([
+  "listingType", "propertyType", "title", "description",
+  "province", "district", "city", "wardNo", "area", "landmark",
+  "price", "videoLink",
+  "photos", "floorPlan", "termsAccepted", "detailsCompletion", "isDetailsValid",
+]);
+
+// Map the wizard's flat formData onto the API's `data` JSON contract.
+const buildListingPayload = (formData: PropertyFormData) => {
+  const details: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(formData)) {
+    if (TOP_LEVEL_FIELDS.has(key)) continue;
+    details[key] = value;
+  }
+
+  return {
+    listingType: formData.listingType,
+    propertyType: formData.propertyType,
+    title: formData.title,
+    description: formData.description,
+    location: {
+      province: formData.province,
+      district: formData.district,
+      city: formData.city,
+      wardNo: formData.wardNo,
+      area: formData.area,
+      landmark: formData.landmark || "",
+    },
+    price: Number(formData.price) || 0,
+    videoLink: formData.videoLink || "",
+    details,
+  };
+};
+
 interface PropertyCreateWizardProps {
   isOpen: boolean;
   onClose: () => void;
@@ -130,6 +169,7 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [, setDraftSavedAt] = useState<string | null>(null);
+  const { accessToken } = useAuth();
 
   // Load draft from localStorage on mount — one-time sync from an external store
   // into React state, so a direct setState here is intentional.
@@ -269,13 +309,48 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
       return;
     }
 
-    setIsSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    if (!accessToken) {
+      toast.error("Please log in to publish a listing.");
+      return;
+    }
 
-    setIsSubmitting(false);
-    setIsSuccess(true);
-    clearDraft();
-    toast.success("Property listing published successfully!");
+    // Drafts only persist photo URLs, not the File objects — require real uploads.
+    const photoFiles = formData.photos.filter((p) => p.file);
+    if (photoFiles.length === 0) {
+      toast.error("Please re-upload your property photos before publishing.");
+      setActiveStep(3);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const fd = new FormData();
+      fd.append("data", JSON.stringify(buildListingPayload(formData)));
+      photoFiles.forEach((p) => fd.append("photos", p.file as File));
+      if (formData.floorPlan?.file) {
+        fd.append("floorPlan", formData.floorPlan.file);
+      }
+
+      const res = await fetch(`${API_BASE}/properties`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: fd,
+      });
+      const json = await res.json();
+
+      if (!res.ok) {
+        toast.error(json.message || "Failed to publish listing. Please try again.");
+        return;
+      }
+
+      setIsSuccess(true);
+      clearDraft();
+      toast.success("Property listing published successfully!");
+    } catch {
+      toast.error("Network error. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleCancel = () => {

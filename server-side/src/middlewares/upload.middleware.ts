@@ -25,6 +25,12 @@ const fileFilter = (
     return cb(new ApiError(HTTP_STATUS.BAD_REQUEST, 'Floor plan must be an image or PDF'));
   }
 
+  if (file.fieldname === 'avatar') {
+    // Profile picture must be an image.
+    if (file.mimetype.startsWith('image/')) return cb(null, true);
+    return cb(new ApiError(HTTP_STATUS.BAD_REQUEST, 'Avatar must be an image file'));
+  }
+
   return cb(new ApiError(HTTP_STATUS.BAD_REQUEST, `Unexpected file field: ${file.fieldname}`));
 };
 
@@ -42,3 +48,6 @@ export const uploadPropertyMedia = upload.fields([
   { name: 'photos', maxCount: 12 },
   { name: 'floorPlan', maxCount: 1 },
 ]);
+
+// Accepts a single `avatar` image file for profile picture uploads.
+export const uploadAvatar = upload.single('avatar');
