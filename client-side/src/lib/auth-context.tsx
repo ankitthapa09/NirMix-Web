@@ -19,6 +19,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (accessToken: string, refreshToken: string, user: User) => void;
   logout: () => Promise<void>;
+  updateUser: (updates: Partial<User>) => void;
   isAuthenticated: boolean;
 }
 
@@ -57,6 +58,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(userData);
   };
 
+  const updateUser = (updates: Partial<User>) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, ...updates };
+      localStorage.setItem("nirmix_user", JSON.stringify(next));
+      return next;
+    });
+  };
+
   const logout = async () => {
     try {
       const token = localStorage.getItem("nirmix_token");
@@ -84,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAuthenticated = !!user;
 
   return (
-    <AuthContext.Provider value={{ user, accessToken, isLoading, login, logout, isAuthenticated }}>
+    <AuthContext.Provider value={{ user, accessToken, isLoading, login, logout, updateUser, isAuthenticated }}>
       {children}
     </AuthContext.Provider>
   );

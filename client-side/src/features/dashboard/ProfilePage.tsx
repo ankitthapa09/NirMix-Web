@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -29,6 +29,7 @@ import {
   AtSign,
   MessageCircle,
   Clock,
+  Loader2,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
@@ -85,7 +86,7 @@ const inputCls =
   "w-full rounded-xl border border-[#E0D4C5] bg-[#FAF7F2] px-3.5 py-2.5 text-sm font-medium text-[#342417] placeholder-[#5C4D3C]/40 outline-none transition focus:border-[#B05B33]/40 focus:bg-white focus:ring-2 focus:ring-[#B05B33]/10";
 
 export function ProfilePage() {
-  const { user } = useAuth();
+  const { user, updateUser, accessToken } = useAuth();
 
   const initial: ProfileForm = {
     name: user?.name ?? "Ram Thapa",
@@ -111,6 +112,40 @@ export function ProfilePage() {
   const [form, setForm] = useState<ProfileForm>(initial);
   const [draft, setDraft] = useState<ProfileForm>(initial);
   const [editing, setEditing] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!accessToken) {
+      toast.error("Please log in to update your photo.");
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const fd = new FormData();
+      fd.append("avatar", file);
+      const res = await fetch("http://localhost:5001/api/users/me/avatar", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: fd,
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        toast.error(json.message || "Failed to update photo.");
+        return;
+      }
+      updateUser({ avatar: json.data.avatar });
+      toast.success("Profile picture updated.");
+    } catch {
+      toast.error("Network error. Please try again.");
+    } finally {
+      setUploadingAvatar(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  };
 
   const v = editing ? draft : form;
   const isPro = v.accountType !== "Personal";
@@ -167,17 +202,36 @@ export function ProfilePage() {
             <div className="flex items-end gap-4">
               <div className="relative">
                 <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-3xl border-4 border-white bg-[#342417] text-2xl font-extrabold text-white shadow-lg sm:h-28 sm:w-28">
-                  {initials}
+                  {user?.avatar ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={user.avatar} alt={v.name} className="h-full w-full object-cover" />
+                  ) : (
+                    initials
+                  )}
                 </div>
                 {editing && (
-                  <button
-                    type="button"
-                    onClick={() => toast.success("Photo updated.")}
-                    className="absolute -bottom-1.5 -right-1.5 flex h-8 w-8 items-center justify-center rounded-xl text-white shadow-md cursor-pointer"
-                    style={{ backgroundColor: ACCENT }}
-                  >
-                    <Camera className="h-4 w-4" />
-                  </button>
+                  <>
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarUpload}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => avatarInputRef.current?.click()}
+                      disabled={uploadingAvatar}
+                      className="absolute -bottom-1.5 -right-1.5 flex h-8 w-8 items-center justify-center rounded-xl text-white shadow-md cursor-pointer disabled:opacity-60"
+                      style={{ backgroundColor: ACCENT }}
+                    >
+                      {uploadingAvatar ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Camera className="h-4 w-4" />
+                      )}
+                    </button>
+                  </>
                 )}
               </div>
               <div className="pb-1">
