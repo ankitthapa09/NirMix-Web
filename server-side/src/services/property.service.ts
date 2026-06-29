@@ -1,7 +1,13 @@
 import { Types } from 'mongoose';
 import { UploadApiResponse } from 'cloudinary';
 import { cloudinary } from '../config/cloudinary.js';
-import { createProperty } from '../repositories/property.repository.js';
+import {
+  createProperty,
+  findPropertiesByOwner,
+  findPropertyById,
+  findPropertyByIdWithOwner,
+  deletePropertyById,
+} from '../repositories/property.repository.js';
 import { updateUser } from '../repositories/user.repository.js';
 import { getNextSequence } from '../repositories/counter.repository.js';
 import { IProperty } from '../models/propertyModel.js';
@@ -89,6 +95,48 @@ class PropertyService {
     await updateUser(ownerId, { hasPostedProperty: true });
 
     return property;
+  }
+
+  /**
+   * Get all listings owned by the authenticated user.
+   */
+  async getMyListings(ownerId: string): Promise<IProperty[]> {
+    return findPropertiesByOwner(ownerId);
+  }
+
+  /**
+   * Get a single listing by id (public), with the owner populated.
+   */
+  async getListingById(id: string): Promise<IProperty> {
+    const property = await findPropertyByIdWithOwner(id);
+    if (!property) {
+      throw new ApiError(HTTP_STATUS.NOT_FOUND, 'Property not found');
+    }
+    return property;
+  }
+
+  /**
+   * Delete a listing the user owns, removing its Cloudinary media too.
+   */
+  async deleteListing(ownerId: string, propertyId: string): Promise<void> {
+    const property = await findPropertyById(propertyId);
+    if (!property) {
+      throw new ApiError(HTTP_STATUS.NOT_FOUND, 'Property not found');
+    }
+    if (property.owner.toString() !== ownerId) {
+      throw new ApiError(HTTP_STATUS.FORBIDDEN, 'You can only delete your own listings');
+    }
+
+    // Best-effort removal of media from Cloudinary so deletes don't leave orphans.
+    const publicIds = [
+      ...property.photos.map((p) => p.publicId),
+      ...(property.floorPlan ? [property.floorPlan.publicId] : []),
+    ];
+    await Promise.all(
+      publicIds.map((id) => cloudinary.uploader.destroy(id).catch(() => undefined))
+    );
+
+    await deletePropertyById(propertyId);
   }
 }
 

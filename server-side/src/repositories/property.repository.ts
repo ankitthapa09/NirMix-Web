@@ -8,3 +8,32 @@ export async function createProperty(data: Partial<IProperty>): Promise<IPropert
   const property = new Property(data);
   return property.save();
 }
+
+/**
+ * Find all listings owned by a user, newest first.
+ */
+export async function findPropertiesByOwner(ownerId: string): Promise<IProperty[]> {
+  return Property.find({ owner: ownerId }).sort({ createdAt: -1 });
+}
+
+/**
+ * Find a single listing by its id.
+ */
+export async function findPropertyById(id: string): Promise<IProperty | null> {
+  return Property.findById(id);
+}
+
+/**
+ * Find a single listing by id with the owner's public fields populated
+ * (for the "Listed by" card on the detail page).
+ */
+export async function findPropertyByIdWithOwner(id: string): Promise<IProperty | null> {
+  return Property.findById(id).populate('owner', 'name avatar contact email isProfessional isEmailVerified');
+}
+
+/**
+ * Delete a listing by its id.
+ */
+export async function deletePropertyById(id: string): Promise<IProperty | null> {
+  return Property.findByIdAndDelete(id);
+}

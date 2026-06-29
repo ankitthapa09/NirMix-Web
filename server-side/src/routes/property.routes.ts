@@ -7,6 +7,18 @@ import { asyncHandler } from '../middlewares/error.middleware.js';
 const router = Router();
 
 /**
+ * GET /api/properties/me
+ * Get the authenticated user's own listings
+ * Headers: Authorization: Bearer <accessToken>
+ */
+router.get(
+  '/me',
+  verifyAccessToken,
+  isAuthenticated,
+  asyncHandler(propertyController.getMyListings.bind(propertyController))
+);
+
+/**
  * POST /api/properties
  * Create a property listing (requires authentication)
  * Headers: Authorization: Bearer <accessToken>
@@ -18,6 +30,24 @@ router.post(
   isAuthenticated,
   uploadPropertyMedia,
   asyncHandler(propertyController.create.bind(propertyController))
+);
+
+/**
+ * GET /api/properties/:id
+ * Get a single listing (public)
+ */
+router.get('/:id', asyncHandler(propertyController.getPropertyById.bind(propertyController)));
+
+/**
+ * DELETE /api/properties/:id
+ * Delete a listing owned by the authenticated user
+ * Headers: Authorization: Bearer <accessToken>
+ */
+router.delete(
+  '/:id',
+  verifyAccessToken,
+  isAuthenticated,
+  asyncHandler(propertyController.deleteProperty.bind(propertyController))
 );
 
 export default router;

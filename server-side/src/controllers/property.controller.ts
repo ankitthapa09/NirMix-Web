@@ -52,6 +52,64 @@ class PropertyController {
       next(error);
     }
   }
+
+  /**
+   * GET /api/properties/me
+   * Get all listings owned by the authenticated user.
+   */
+  async getMyListings(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const ownerId = req.user?.id;
+      if (!ownerId) {
+        throw new ApiError(HTTP_STATUS.UNAUTHORIZED, 'User not authenticated');
+      }
+
+      const properties = await propertyService.getMyListings(ownerId);
+
+      res.status(HTTP_STATUS.OK).json(
+        new ApiResponse(HTTP_STATUS.OK, properties, 'Listings fetched successfully')
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/properties/:id
+   * Get a single listing (public).
+   */
+  async getPropertyById(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const property = await propertyService.getListingById(String(req.params.id));
+
+      res.status(HTTP_STATUS.OK).json(
+        new ApiResponse(HTTP_STATUS.OK, property, 'Property fetched successfully')
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * DELETE /api/properties/:id
+   * Delete a listing the authenticated user owns.
+   */
+  async deleteProperty(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const ownerId = req.user?.id;
+      if (!ownerId) {
+        throw new ApiError(HTTP_STATUS.UNAUTHORIZED, 'User not authenticated');
+      }
+
+      await propertyService.deleteListing(ownerId, String(req.params.id));
+
+      res.status(HTTP_STATUS.OK).json(
+        new ApiResponse(HTTP_STATUS.OK, null, 'Listing deleted successfully')
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default new PropertyController();
