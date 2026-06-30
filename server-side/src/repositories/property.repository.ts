@@ -39,6 +39,13 @@ export async function findPropertyByIdWithOwner(id: string): Promise<IProperty |
 }
 
 /**
+ * Update a listing by its id.
+ */
+export async function updateProperty(id: string, updates: Partial<IProperty>): Promise<IProperty | null> {
+  return Property.findByIdAndUpdate(id, updates, { new: true, runValidators: true });
+}
+
+/**
  * Delete a listing by its id.
  */
 export async function deletePropertyById(id: string): Promise<IProperty | null> {

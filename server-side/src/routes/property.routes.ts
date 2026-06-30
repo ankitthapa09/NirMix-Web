@@ -45,6 +45,20 @@ router.get('/', asyncHandler(propertyController.listProperties.bind(propertyCont
 router.get('/:id', asyncHandler(propertyController.getPropertyById.bind(propertyController)));
 
 /**
+ * PATCH /api/properties/:id
+ * Update a listing owned by the authenticated user
+ * Headers: Authorization: Bearer <accessToken>
+ * Body: multipart/form-data — data (JSON), new photos[], optional floorPlan
+ */
+router.patch(
+  '/:id',
+  verifyAccessToken,
+  isAuthenticated,
+  uploadPropertyMedia,
+  asyncHandler(propertyController.updateProperty.bind(propertyController))
+);
+
+/**
  * DELETE /api/properties/:id
  * Delete a listing owned by the authenticated user
  * Headers: Authorization: Bearer <accessToken>

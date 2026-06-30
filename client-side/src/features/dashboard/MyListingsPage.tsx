@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Plus, Home, AlertCircle, RotateCw, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
@@ -13,6 +14,7 @@ const API_BASE = "http://localhost:5001/api";
 
 export function MyListingsPage() {
   const { accessToken, isLoading: authLoading } = useAuth();
+  const router = useRouter();
   const [listings, setListings] = useState<ApiProperty[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -155,7 +157,7 @@ export function MyListingsPage() {
               <MyListingCard
                 key={p._id}
                 property={p}
-                onEdit={() => toast.info("Editing listings is coming soon.")}
+                onEdit={() => router.push(`/dashboard?edit=${p._id}`)}
                 onDelete={() => setDeleteTarget(p)}
               />
             ))}

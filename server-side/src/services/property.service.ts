@@ -7,6 +7,7 @@ import {
   findActiveProperties,
   findPropertyById,
   findPropertyByIdWithOwner,
+  updateProperty,
   deletePropertyById,
 } from '../repositories/property.repository.js';
 import { updateUser } from '../repositories/user.repository.js';
@@ -14,6 +15,7 @@ import { getNextSequence } from '../repositories/counter.repository.js';
 import { IProperty } from '../models/propertyModel.js';
 import {
   CreatePropertyInput,
+  UpdatePropertyInput,
   IPropertyMedia,
   buildReferenceId,
   referenceKey,
@@ -121,6 +123,77 @@ class PropertyService {
       throw new ApiError(HTTP_STATUS.NOT_FOUND, 'Property not found');
     }
     return property;
+  }
+
+  /**
+   * Update a listing the user owns. Diffs media against what the client kept:
+   * removes dropped images from Cloudinary, uploads new ones. Listing/property
+   * type and the reference code are preserved.
+   */
+  async updateListing(
+    ownerId: string,
+    propertyId: string,
+    data: UpdatePropertyInput,
+    files: PropertyMediaFiles
+  ): Promise<IProperty> {
+    const property = await findPropertyById(propertyId);
+    if (!property) {
+      throw new ApiError(HTTP_STATUS.NOT_FOUND, 'Property not found');
+    }
+    if (property.owner.toString() !== ownerId) {
+      throw new ApiError(HTTP_STATUS.FORBIDDEN, 'You can only edit your own listings');
+    }
+
+    // ── Photos: keep the ones the client kept, delete the rest, upload new files ──
+    const keptPhotos = data.existingPhotos ?? [];
+    const keptIds = new Set(keptPhotos.map((p) => p.publicId));
+    const removedPhotos = property.photos.filter((p) => !keptIds.has(p.publicId));
+
+    const newPhotos = await Promise.all(
+      (files.photos ?? []).map((file) => this.uploadToCloudinary(file, 'nirmix/properties'))
+    );
+
+    const photos = [...keptPhotos, ...newPhotos];
+    if (photos.length === 0) {
+      throw new ApiError(HTTP_STATUS.BAD_REQUEST, 'At least one property photo is required');
+    }
+
+    // ── Floor plan: new file replaces; otherwise keep the kept one or drop it ──
+    let floorPlan: IPropertyMedia | undefined;
+    const floorPlanFile = files.floorPlan?.[0];
+    if (floorPlanFile) {
+      floorPlan = await this.uploadToCloudinary(floorPlanFile, 'nirmix/floor-plans');
+    } else if (data.existingFloorPlan) {
+      floorPlan = data.existingFloorPlan;
+    }
+
+    // Remove orphaned media from Cloudinary (best effort).
+    const orphanIds = removedPhotos.map((p) => p.publicId);
+    if (
+      property.floorPlan &&
+      (!floorPlan || floorPlan.publicId !== property.floorPlan.publicId)
+    ) {
+      orphanIds.push(property.floorPlan.publicId);
+    }
+    await Promise.all(
+      orphanIds.map((id) => cloudinary.uploader.destroy(id).catch(() => undefined))
+    );
+
+    const updated = await updateProperty(propertyId, {
+      title: data.title,
+      description: data.description,
+      location: data.location,
+      price: data.price,
+      videoLink: data.videoLink,
+      details: data.details,
+      photos,
+      floorPlan,
+    });
+
+    if (!updated) {
+      throw new ApiError(HTTP_STATUS.NOT_FOUND, 'Property not found');
+    }
+    return updated;
   }
 
   /**

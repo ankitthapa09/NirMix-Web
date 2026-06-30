@@ -34,6 +34,18 @@ export const createPropertySchema = z.object({
 
 export type CreatePropertyInput = z.infer<typeof createPropertySchema>;
 
+// Update payload: the create fields plus references to the media the user kept.
+// New photos / floor plan still arrive as files; listingType & propertyType are
+// accepted but ignored by the service (they're locked to preserve the reference code).
+const mediaRefSchema = z.object({ url: z.string(), publicId: z.string() });
+
+export const updatePropertySchema = createPropertySchema.extend({
+  existingPhotos: z.array(mediaRefSchema).optional().default([]),
+  existingFloorPlan: mediaRefSchema.nullable().optional(),
+});
+
+export type UpdatePropertyInput = z.infer<typeof updatePropertySchema>;
+
 // ── Human-readable reference code, e.g. "SALE-LAND-0001" ──
 export const LISTING_CODES: Record<ListingType, string> = {
   'For Sale': 'SALE',

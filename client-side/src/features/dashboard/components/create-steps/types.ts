@@ -4,6 +4,8 @@ export interface MediaItem {
   url: string;
   name?: string;
   file?: File;
+  /** Set for media already stored on the server (Cloudinary), used when editing. */
+  publicId?: string;
 }
 
 // The wizard's form is mostly known fields, but the Details step also writes a
