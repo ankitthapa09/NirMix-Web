@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Search,
   ChevronDown,
@@ -14,7 +14,7 @@ import {
 import { Navbar } from "@/features/landing/components/Navbar";
 import { Footer } from "@/features/landing/components/Footer";
 import { DashboardPropertyCard } from "@/features/dashboard/components/DashboardPropertyCard";
-import { getListingsByStatus, allProperties } from "@/lib/mock-data";
+import { fetchProperties } from "@/lib/property-api";
 import type { Property } from "@/types/property";
 import { PropertyFilters } from "./components/PropertyFilters";
 import { CategoryCards } from "./components/CategoryCards";
@@ -73,9 +73,29 @@ export function PropertyListingPage({ mode, initialType, initialStatus }: Proper
         ? { one: "rental", many: "rentals" }
         : { one: "property", many: "properties" };
 
+  const [allProps, setAllProps] = useState<Property[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const list = await fetchProperties();
+        if (active) setAllProps(list);
+      } catch {
+        // Network/API error — fall through to the empty state.
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const data = useMemo(
-    () => (mode === "all" ? allProperties : getListingsByStatus(copy.status)),
-    [mode, copy.status]
+    () => (mode === "all" ? allProps : allProps.filter((p) => p.status === copy.status)),
+    [allProps, mode, copy.status]
   );
 
   const validInitialCategory =
@@ -292,7 +312,20 @@ export function PropertyListingPage({ mode, initialType, initialStatus }: Proper
             </div>
 
             {/* Results grid */}
-            {results.length > 0 ? (
+            {loading ? (
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="overflow-hidden rounded-2xl border border-mist bg-white">
+                    <div className="h-48 w-full animate-pulse bg-[#EFE7D8]" />
+                    <div className="space-y-3 p-4">
+                      <div className="h-4 w-3/4 animate-pulse rounded bg-[#EFE7D8]" />
+                      <div className="h-3 w-1/2 animate-pulse rounded bg-[#EFE7D8]" />
+                      <div className="h-5 w-1/3 animate-pulse rounded bg-[#EFE7D8]" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : results.length > 0 ? (
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
                 {results.map((property) => (
                   <DashboardPropertyCard key={property.id} property={property} />

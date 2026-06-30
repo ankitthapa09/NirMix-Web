@@ -3,7 +3,7 @@
 import { Home, Building, Map, Bed, Building2, Briefcase, Store } from "lucide-react";
 import { PropertyFormData, StepProps } from "./types";
 
-type StepBasicsProps = StepProps;
+type StepBasicsProps = StepProps & { locked?: boolean };
 
 const PROPERTY_TYPES = [
   {
@@ -83,7 +83,7 @@ const DETAIL_FIELDS_TO_RESET = {
   amenities: [],
 };
 
-export function StepBasics({ formData, onChange, errors }: StepBasicsProps) {
+export function StepBasics({ formData, onChange, errors, locked }: StepBasicsProps) {
   const { listingType, propertyType, title, description } = formData;
 
   const handleUpdate = (fields: Partial<PropertyFormData>) => {
@@ -91,6 +91,7 @@ export function StepBasics({ formData, onChange, errors }: StepBasicsProps) {
   };
 
   const handleListingTypeChange = (newListingType: string) => {
+    if (locked) return;
     if (listingType === newListingType) return;
 
     let newPropertyType = propertyType;
@@ -110,6 +111,7 @@ export function StepBasics({ formData, onChange, errors }: StepBasicsProps) {
   };
 
   const handlePropertyTypeChange = (newPropertyType: string) => {
+    if (locked) return;
     if (propertyType === newPropertyType) return;
 
     onChange({
@@ -124,12 +126,20 @@ export function StepBasics({ formData, onChange, errors }: StepBasicsProps) {
   return (
     <div className="space-y-5">
       {/* Listing Type Toggle — engraved track, raised active pill */}
-      <div>
-        <label className="nm-label">Listing type</label>
+      <div className={locked ? "opacity-70" : ""}>
+        <label className="nm-label">
+          Listing type
+          {locked && (
+            <span className="ml-2 font-medium normal-case text-[#5C4D3C]/60">
+              · can&apos;t be changed when editing
+            </span>
+          )}
+        </label>
         <div className="nm-track inline-flex p-1 rounded-xl gap-1 w-full sm:w-72">
           <button
             type="button"
             onClick={() => handleListingTypeChange("For Sale")}
+            disabled={locked}
             style={listingType === "For Sale" ? { backgroundColor: "var(--nm-accent)" } : undefined}
             className={`flex-1 py-2 text-center text-xs rounded-lg transition-all cursor-pointer ${listingType === "For Sale"
               ? "text-[#342417] font-extrabold shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_2px_5px_rgba(90,66,38,0.25)]"
@@ -141,6 +151,7 @@ export function StepBasics({ formData, onChange, errors }: StepBasicsProps) {
           <button
             type="button"
             onClick={() => handleListingTypeChange("For Rent")}
+            disabled={locked}
             style={listingType === "For Rent" ? { backgroundColor: "var(--nm-accent)" } : undefined}
             className={`flex-1 py-2 text-center text-xs rounded-lg transition-all cursor-pointer ${listingType === "For Rent"
               ? "text-white font-extrabold shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_5px_rgba(90,66,38,0.25)]"
@@ -156,8 +167,15 @@ export function StepBasics({ formData, onChange, errors }: StepBasicsProps) {
       </div>
 
       {/* Property Type Selection Cards */}
-      <div>
-        <label className="nm-label">Property type</label>
+      <div className={locked ? "opacity-70" : ""}>
+        <label className="nm-label">
+          Property type
+          {locked && (
+            <span className="ml-2 font-medium normal-case text-[#5C4D3C]/60">
+              · can&apos;t be changed when editing
+            </span>
+          )}
+        </label>
         <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
           {visibleTypes.map((type) => {
             const Icon = type.icon;
@@ -167,6 +185,7 @@ export function StepBasics({ formData, onChange, errors }: StepBasicsProps) {
               <button
                 key={type.id}
                 type="button"
+                disabled={locked}
                 onClick={() => handlePropertyTypeChange(type.id)}
                 className={`nm-tile flex flex-col items-start justify-between p-4 text-left cursor-pointer h-24 ${isSelected ? "is-selected" : ""}`}
               >

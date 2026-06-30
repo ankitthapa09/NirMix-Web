@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { CheckCircle2, ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -10,6 +11,7 @@ import { StepDetails } from "./create-steps/StepDetails";
 import { StepMedia } from "./create-steps/StepMedia";
 import { StepReview } from "./create-steps/StepReview";
 import { PropertyFormData, MediaItem, isMediaItem } from "./create-steps/types";
+import { useAuth } from "@/lib/auth-context";
 
 const STEPS = [
   { label: "Basics", desc: "Type & Description" },
@@ -118,37 +120,89 @@ const sanitizeData = (input: unknown): PropertyFormData => {
   };
 };
 
+const API_BASE = "http://localhost:5001/api";
+
+// Fields sent top-level / handled separately; everything else on the wizard's flat
+// formData is bundled into `details` to match the API's create contract.
+const TOP_LEVEL_FIELDS = new Set([
+  "listingType", "propertyType", "title", "description",
+  "province", "district", "city", "wardNo", "area", "landmark",
+  "price", "videoLink",
+  "photos", "floorPlan", "termsAccepted", "detailsCompletion", "isDetailsValid",
+]);
+
+// Map the wizard's flat formData onto the API's `data` JSON contract.
+const buildListingPayload = (formData: PropertyFormData) => {
+  const details: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(formData)) {
+    if (TOP_LEVEL_FIELDS.has(key)) continue;
+    details[key] = value;
+  }
+
+  return {
+    listingType: formData.listingType,
+    propertyType: formData.propertyType,
+    title: formData.title,
+    description: formData.description,
+    location: {
+      province: formData.province,
+      district: formData.district,
+      city: formData.city,
+      wardNo: formData.wardNo,
+      area: formData.area,
+      landmark: formData.landmark || "",
+    },
+    price: Number(formData.price) || 0,
+    videoLink: formData.videoLink || "",
+    details,
+  };
+};
+
 interface PropertyCreateWizardProps {
   isOpen: boolean;
   onClose: () => void;
+  /** When set, the wizard runs in edit mode (PATCH) instead of create (POST). */
+  editId?: string;
+  /** Prefilled form data for edit mode. */
+  editData?: Partial<PropertyFormData> | null;
 }
 
-export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardProps) {
+export function PropertyCreateWizard({ isOpen, onClose, editId, editData }: PropertyCreateWizardProps) {
+  const isEditMode = !!editId;
+  const router = useRouter();
   const [activeStep, setActiveStep] = useState(0);
   const [formData, setFormData] = useState<PropertyFormData>(INITIAL_FORM_STATE);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [, setDraftSavedAt] = useState<string | null>(null);
+  const { accessToken } = useAuth();
 
   // Load draft from localStorage on mount — one-time sync from an external store
   // into React state, so a direct setState here is intentional.
   useEffect(() => {
-    if (isOpen) {
-      const savedDraft = localStorage.getItem("nirmix_property_draft");
-      if (savedDraft) {
-        try {
-          const parsed = JSON.parse(savedDraft);
-          const sanitized = sanitizeData(parsed);
-          // eslint-disable-next-line react-hooks/set-state-in-effect
-          setFormData(sanitized);
-          toast.info("Restored property draft.");
-        } catch (e) {
-          console.error("Failed to restore draft", e);
-        }
+    if (!isOpen) return;
+
+    // Edit mode: prefill from the existing listing; ignore any create-draft.
+    if (editData) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setFormData({ ...INITIAL_FORM_STATE, ...editData });
+      return;
+    }
+
+    const savedDraft = localStorage.getItem("nirmix_property_draft");
+    if (savedDraft) {
+      try {
+        const parsed = JSON.parse(savedDraft);
+        const sanitized = sanitizeData(parsed);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setFormData(sanitized);
+        toast.info("Restored property draft.");
+      } catch (e) {
+        console.error("Failed to restore draft", e);
       }
     }
-  }, [isOpen]);
+  }, [isOpen, editData]);
 
   // Disable background scrolling when modal is open
   useEffect(() => {
@@ -193,7 +247,7 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
   const handleFormChange = (updatedData: Partial<PropertyFormData>) => {
     const nextData = { ...formData, ...updatedData };
     setFormData(nextData);
-    saveDraft(nextData);
+    if (!isEditMode) saveDraft(nextData);
     setErrors({});
   };
 
@@ -269,13 +323,67 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
       return;
     }
 
-    setIsSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    if (!accessToken) {
+      toast.error("Please log in to publish a listing.");
+      return;
+    }
 
-    setIsSubmitting(false);
-    setIsSuccess(true);
-    clearDraft();
-    toast.success("Property listing published successfully!");
+    // New uploads carry a File; existing (server-stored) photos carry a publicId.
+    const newPhotoFiles = formData.photos.filter((p) => p.file);
+    const keptPhotos = formData.photos.filter((p) => !p.file && p.publicId);
+    if (newPhotoFiles.length + keptPhotos.length === 0) {
+      toast.error(
+        isEditMode
+          ? "Keep or add at least one property photo."
+          : "Please re-upload your property photos before publishing."
+      );
+      setActiveStep(3);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const payload: Record<string, unknown> = buildListingPayload(formData);
+
+      if (isEditMode) {
+        payload.existingPhotos = keptPhotos.map((p) => ({ url: p.url, publicId: p.publicId }));
+        const fp = formData.floorPlan;
+        payload.existingFloorPlan =
+          fp && !fp.file && fp.publicId ? { url: fp.url, publicId: fp.publicId } : null;
+      }
+
+      const fd = new FormData();
+      fd.append("data", JSON.stringify(payload));
+      newPhotoFiles.forEach((p) => fd.append("photos", p.file as File));
+      if (formData.floorPlan?.file) {
+        fd.append("floorPlan", formData.floorPlan.file);
+      }
+
+      const res = await fetch(
+        isEditMode ? `${API_BASE}/properties/${editId}` : `${API_BASE}/properties`,
+        {
+          method: isEditMode ? "PATCH" : "POST",
+          headers: { Authorization: `Bearer ${accessToken}` },
+          body: fd,
+        }
+      );
+      const json = await res.json();
+
+      if (!res.ok) {
+        toast.error(json.message || "Failed to save listing. Please try again.");
+        return;
+      }
+
+      setIsSuccess(true);
+      if (!isEditMode) clearDraft();
+      toast.success(
+        isEditMode ? "Listing updated successfully!" : "Property listing published successfully!"
+      );
+    } catch {
+      toast.error("Network error. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleCancel = () => {
@@ -294,6 +402,7 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
             formData={formData}
             onChange={handleFormChange}
             errors={errors}
+            locked={isEditMode}
           />
         );
       case 1:
@@ -651,33 +760,51 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
                   </div>
 
                   <h2 className="text-2xl sm:text-3xl font-extrabold text-[#342417] tracking-tight mb-2 sm:mb-3">
-                    Property Listed Successfully!
+                    {isEditMode ? "Property Updated Successfully!" : "Property Listed Successfully!"}
                   </h2>
 
                   <p className="text-sm sm:text-base text-[#342417]/70 max-w-md mb-6 sm:mb-8 leading-relaxed font-medium">
-                    Your listing <span className="font-bold text-[#342417]">&quot;{formData.title}&quot;</span> is now live. Buyers and renters can discover and view your listing details.
+                    Your listing <span className="font-bold text-[#342417]">&quot;{formData.title}&quot;</span>{" "}
+                    {isEditMode
+                      ? "has been updated. Your changes are now live."
+                      : "is now live. Buyers and renters can discover and view your listing details."}
                   </p>
 
                   <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full justify-center">
-                    <button
-                      onClick={() => {
-                        resetWizard();
-                        onClose();
-                      }}
-                      className="nm-btn nm-btn-dark px-6 py-3 text-white text-xs sm:text-sm font-bold cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      Go to Dashboard
-                    </button>
+                    {isEditMode ? (
+                      <button
+                        onClick={() => {
+                          resetWizard();
+                          router.push("/dashboard/my-listings");
+                        }}
+                        className="nm-btn nm-btn-dark px-6 py-3 text-white text-xs sm:text-sm font-bold cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        Go to My Listings
+                        <ArrowRight className="h-4 w-4" />
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => {
+                            resetWizard();
+                            onClose();
+                          }}
+                          className="nm-btn nm-btn-dark px-6 py-3 text-white text-xs sm:text-sm font-bold cursor-pointer flex items-center justify-center gap-2"
+                        >
+                          Go to Dashboard
+                        </button>
 
-                    <button
-                      onClick={() => {
-                        resetWizard();
-                      }}
-                      className="nm-btn nm-btn-paper px-6 py-3 text-xs sm:text-sm font-bold text-[#342417] cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      Post Another Property
-                      <ArrowRight className="h-4 w-4" />
-                    </button>
+                        <button
+                          onClick={() => {
+                            resetWizard();
+                          }}
+                          className="nm-btn nm-btn-paper px-6 py-3 text-xs sm:text-sm font-bold text-[#342417] cursor-pointer flex items-center justify-center gap-2"
+                        >
+                          Post Another Property
+                          <ArrowRight className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -760,12 +887,10 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
                     {isSubmitting ? (
                       <>
                         <Loader2 className={`h-3 w-3 animate-spin ${primaryTextClass}`} />
-                        Publishing...
+                        {isEditMode ? "Saving..." : "Publishing..."}
                       </>
                     ) : (
-                      <>
-                        Continue →
-                      </>
+                      <>{isEditMode ? "Save Changes" : "Publish"}</>
                     )}
                   </button>
                 )
@@ -823,12 +948,10 @@ export function PropertyCreateWizard({ isOpen, onClose }: PropertyCreateWizardPr
                     {isSubmitting ? (
                       <>
                         <Loader2 className={`h-3.5 w-3.5 animate-spin ${primaryTextClass}`} />
-                        Publishing...
+                        {isEditMode ? "Saving..." : "Publishing..."}
                       </>
                     ) : (
-                      <>
-                        Continue →
-                      </>
+                      <>{isEditMode ? "Save Changes" : "Publish"}</>
                     )}
                   </button>
                 )

@@ -1,16 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
-import { dashboardFeedProperties } from "@/lib/mock-data";
+import { fetchProperties } from "@/lib/property-api";
+import type { Property } from "@/types/property";
 import { DashboardPropertyCard } from "./DashboardPropertyCard";
 
 type FilterTab = "All" | "Buy" | "Rent";
 
 export function PropertyFeed() {
   const [activeTab, setActiveTab] = useState<FilterTab>("All");
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredProperties = dashboardFeedProperties.filter((p) => {
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const list = await fetchProperties();
+        if (active) setProperties(list);
+      } catch {
+        // Network/API error — show the empty state.
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const filteredProperties = properties.filter((p) => {
     if (activeTab === "All") return true;
     if (activeTab === "Buy") return p.status === "For Sale";
     if (activeTab === "Rent") return p.status === "For Rent";
@@ -55,11 +75,33 @@ export function PropertyFeed() {
       </div>
 
       {/* Property Grid */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        {filteredProperties.map((property) => (
-          <DashboardPropertyCard key={property.id} property={property} />
-        ))}
-      </div>
+      {loading ? (
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="overflow-hidden rounded-2xl border border-[#E0D4C5]/60 bg-white">
+              <div className="h-48 w-full animate-pulse bg-[#EFE7D8]" />
+              <div className="space-y-3 p-4">
+                <div className="h-4 w-3/4 animate-pulse rounded bg-[#EFE7D8]" />
+                <div className="h-3 w-1/2 animate-pulse rounded bg-[#EFE7D8]" />
+                <div className="h-5 w-1/3 animate-pulse rounded bg-[#EFE7D8]" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filteredProperties.length > 0 ? (
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          {filteredProperties.map((property) => (
+            <DashboardPropertyCard key={property.id} property={property} />
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[#E0D4C5] bg-white/60 px-6 py-14 text-center">
+          <p className="text-sm font-semibold text-[#342417]">No properties to show yet</p>
+          <p className="mt-1 text-xs text-[#5C4D3C]/65">
+            New verified listings will appear here as they&apos;re published.
+          </p>
+        </div>
+      )}
     </section>
   );
 }

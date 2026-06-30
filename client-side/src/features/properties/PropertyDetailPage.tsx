@@ -42,6 +42,8 @@ import type { Property, Lister, PropertyType } from "@/types/property";
 
 interface PropertyDetailPageProps {
   property: Property;
+  /** Optional contextual back link (e.g. when arriving from the dashboard). */
+  backTo?: { href: string; label: string };
 }
 
 const TYPE_ICON: Record<PropertyType, typeof Home> = {
@@ -151,7 +153,7 @@ function Stars({ value, size = "h-4 w-4" }: { value: number; size?: string }) {
   );
 }
 
-export function PropertyDetailPage({ property }: PropertyDetailPageProps) {
+export function PropertyDetailPage({ property, backTo }: PropertyDetailPageProps) {
   const accent = property.status === "For Rent" ? "#157A74" : "#B05B33";
   const TypeIcon = TYPE_ICON[property.type] ?? Home;
 
@@ -242,6 +244,17 @@ export function PropertyDetailPage({ property }: PropertyDetailPageProps) {
       <Navbar />
 
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
+        {/* Contextual back (e.g. from the dashboard) */}
+        {backTo && (
+          <Link
+            href={backTo.href}
+            className="mb-4 inline-flex items-center gap-1.5 rounded-lg border border-mist bg-white px-3 py-1.5 text-xs font-bold text-[#342417] shadow-sm transition hover:-translate-x-0.5 hover:border-[#342417]/25"
+          >
+            <ChevronRight className="h-3.5 w-3.5 rotate-180" />
+            {backTo.label}
+          </Link>
+        )}
+
         {/* Breadcrumb */}
         <nav className="mb-4 flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-[#5C4D3C]/70">
           <Link href="/" className="hover:text-[#342417] transition-colors">Home</Link>
