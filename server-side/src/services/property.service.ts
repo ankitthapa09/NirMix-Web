@@ -4,6 +4,7 @@ import { cloudinary } from '../config/cloudinary.js';
 import {
   createProperty,
   findPropertiesByOwner,
+  findActiveProperties,
   findPropertyById,
   findPropertyByIdWithOwner,
   deletePropertyById,
@@ -102,6 +103,13 @@ class PropertyService {
    */
   async getMyListings(ownerId: string): Promise<IProperty[]> {
     return findPropertiesByOwner(ownerId);
+  }
+
+  /**
+   * Get all active listings for the public browse pages.
+   */
+  async getAllListings(): Promise<IProperty[]> {
+    return findActiveProperties();
   }
 
   /**

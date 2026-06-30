@@ -75,6 +75,22 @@ class PropertyController {
   }
 
   /**
+   * GET /api/properties
+   * List all active listings (public).
+   */
+  async listProperties(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const properties = await propertyService.getAllListings();
+
+      res.status(HTTP_STATUS.OK).json(
+        new ApiResponse(HTTP_STATUS.OK, properties, 'Properties fetched successfully')
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * GET /api/properties/:id
    * Get a single listing (public).
    */

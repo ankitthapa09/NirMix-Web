@@ -17,6 +17,13 @@ export async function findPropertiesByOwner(ownerId: string): Promise<IProperty[
 }
 
 /**
+ * Find all active (publicly visible) listings, newest first.
+ */
+export async function findActiveProperties(): Promise<IProperty[]> {
+  return Property.find({ status: 'active' }).sort({ createdAt: -1 });
+}
+
+/**
  * Find a single listing by its id.
  */
 export async function findPropertyById(id: string): Promise<IProperty | null> {

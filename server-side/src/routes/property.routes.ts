@@ -33,6 +33,12 @@ router.post(
 );
 
 /**
+ * GET /api/properties
+ * List all active listings (public)
+ */
+router.get('/', asyncHandler(propertyController.listProperties.bind(propertyController)));
+
+/**
  * GET /api/properties/:id
  * Get a single listing (public)
  */
