@@ -311,9 +311,7 @@ const PROPERTY_SCHEMAS: Record<string, SectionConfig[]> = {
         { key: "landArea", label: "Plot Area", type: "custom-land-area", required: true },
         { key: "builtUpArea", label: "Built-up Area (Sq.Ft)", type: "number", placeholder: "e.g. 2500", required: true },
         { key: "carpetArea", label: "Carpet Area (Sq.Ft)", type: "number", placeholder: "e.g. 2100", required: false },
-        { key: "dimensions", label: "Dimensions (L×B)", type: "text", placeholder: "e.g. 40x50", required: false },
         { key: "floors", label: "Total Floors in Building", type: "number", placeholder: "e.g. 3", required: false },
-        { key: "floor", label: "Floors Owned / Level", type: "number", placeholder: "e.g. 2.5", required: false },
       ],
     },
     {

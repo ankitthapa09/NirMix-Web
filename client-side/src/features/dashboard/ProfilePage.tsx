@@ -33,6 +33,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { apiFetch } from "@/lib/api-client";
 
 const ACCENT = "#B05B33";
 
@@ -129,9 +130,8 @@ export function ProfilePage() {
     try {
       const fd = new FormData();
       fd.append("avatar", file);
-      const res = await fetch("http://localhost:5001/api/users/me/avatar", {
+      const res = await apiFetch("http://localhost:5001/api/users/me/avatar", {
         method: "PATCH",
-        headers: { Authorization: `Bearer ${accessToken}` },
         body: fd,
       });
       const json = await res.json();
@@ -159,9 +159,8 @@ export function ProfilePage() {
 
     setRemovingAvatar(true);
     try {
-      const res = await fetch("http://localhost:5001/api/users/me/avatar", {
+      const res = await apiFetch("http://localhost:5001/api/users/me/avatar", {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${accessToken}` },
       });
       const json = await res.json();
       if (!res.ok) {

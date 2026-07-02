@@ -12,6 +12,7 @@ import { StepMedia } from "./create-steps/StepMedia";
 import { StepReview } from "./create-steps/StepReview";
 import { PropertyFormData, MediaItem, isMediaItem } from "./create-steps/types";
 import { useAuth } from "@/lib/auth-context";
+import { apiFetch } from "@/lib/api-client";
 
 const STEPS = [
   { label: "Basics", desc: "Type & Description" },
@@ -359,11 +360,10 @@ export function PropertyCreateWizard({ isOpen, onClose, editId, editData }: Prop
         fd.append("floorPlan", formData.floorPlan.file);
       }
 
-      const res = await fetch(
+      const res = await apiFetch(
         isEditMode ? `${API_BASE}/properties/${editId}` : `${API_BASE}/properties`,
         {
           method: isEditMode ? "PATCH" : "POST",
-          headers: { Authorization: `Bearer ${accessToken}` },
           body: fd,
         }
       );
@@ -621,7 +621,7 @@ export function PropertyCreateWizard({ isOpen, onClose, editId, editData }: Prop
         }
       `}</style>
 
-      <div className="relative z-10 w-full max-w-[1300px] h-full max-h-[85vh] md:max-h-[88vh] flex flex-col justify-between">
+      <div className="relative z-10 w-full min-w-0 max-w-[1300px] h-full max-h-[85vh] md:max-h-[88vh] flex flex-col justify-between">
         {/* Desktop-only Header Section */}
         <div className="max-lg:hidden lg:flex justify-between items-start gap-4 mb-6 shrink-0 pl-0">
           {/* Left: Title */}
@@ -651,7 +651,7 @@ export function PropertyCreateWizard({ isOpen, onClose, editId, editData }: Prop
         </div>
 
         {/* Horizontal columns container */}
-        <div className="flex-1 min-h-0 flex flex-col lg:flex-row items-stretch justify-between gap-4 sm:gap-6">
+        <div className="flex-1 min-h-0 min-w-0 flex flex-col lg:flex-row items-stretch justify-between gap-4 sm:gap-6">
           {/* Left Column: Back navigation (Desktop only) */}
           <div className="max-lg:hidden lg:flex w-32 shrink-0 flex-col justify-end pb-3">
             {!isSuccess && activeStep > 0 ? (
@@ -668,7 +668,7 @@ export function PropertyCreateWizard({ isOpen, onClose, editId, editData }: Prop
           </div>
 
           {/* Middle Column: Title, Stepper, and Card */}
-          <div className="flex-1 h-full flex flex-col min-h-0 justify-start w-full">
+          <div className="flex-1 min-w-0 h-full flex flex-col min-h-0 justify-start w-full">
             {/* Top Header Row on Mobile: Logo, Title, and top buttons */}
             <div className="lg:hidden shrink-0 flex flex-col gap-3 mb-3 px-2">
               <div className="flex justify-between items-center gap-4">
@@ -917,7 +917,7 @@ export function PropertyCreateWizard({ isOpen, onClose, editId, editData }: Prop
                 <button
                   type="button"
                   onClick={handleCancel}
-                  className="nm-btn nm-btn-danger w-fit px-5 py-2.5 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="nm-btn nm-btn-danger w-full px-5 py-2.5 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   Cancel ☒
                 </button>
@@ -925,7 +925,7 @@ export function PropertyCreateWizard({ isOpen, onClose, editId, editData }: Prop
             </div>
 
             {/* Continue / Publish Action */}
-            <div className="w-fit">
+            <div className="w-full">
               {!isSuccess && (
                 activeStep < STEPS.length - 1 ? (
                   <button

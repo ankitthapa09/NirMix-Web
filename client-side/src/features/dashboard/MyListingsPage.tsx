@@ -6,11 +6,11 @@ import { useRouter } from "next/navigation";
 import { Plus, Home, AlertCircle, RotateCw, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
+import { apiFetch } from "@/lib/api-client";
+import { API_BASE } from "@/lib/property-api";
 import { MyListingCard, type ApiProperty } from "./components/MyListingCard";
 
 type Tab = "all" | "sale" | "rent";
-
-const API_BASE = "http://localhost:5001/api";
 
 export function MyListingsPage() {
   const { accessToken, isLoading: authLoading } = useAuth();
@@ -27,9 +27,8 @@ export function MyListingsPage() {
     if (!deleteTarget || !accessToken) return;
     setDeleting(true);
     try {
-      const res = await fetch(`${API_BASE}/properties/${deleteTarget._id}`, {
+      const res = await apiFetch(`${API_BASE}/properties/${deleteTarget._id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${accessToken}` },
       });
       const json = await res.json();
       if (!res.ok) {
@@ -61,9 +60,7 @@ export function MyListingsPage() {
       setLoading(true);
       setError("");
       try {
-        const res = await fetch(`${API_BASE}/properties/me`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
+        const res = await apiFetch(`${API_BASE}/properties/me`);
         const json = await res.json();
         if (!active) return;
         if (!res.ok) {

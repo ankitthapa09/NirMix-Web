@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
+import { apiFetch } from "@/lib/api-client";
 import {
   ShieldCheck,
   Bell,
@@ -220,9 +221,9 @@ export function SettingsPage() {
 
     setSavingPwd(true);
     try {
-      const res = await fetch("http://localhost:5001/api/users/me/password", {
+      const res = await apiFetch("http://localhost:5001/api/users/me/password", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ currentPassword: pwd.current, newPassword: pwd.next }),
       });
       const json = await res.json();
