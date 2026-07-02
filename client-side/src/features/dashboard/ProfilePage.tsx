@@ -30,6 +30,7 @@ import {
   MessageCircle,
   Clock,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
@@ -113,6 +114,7 @@ export function ProfilePage() {
   const [draft, setDraft] = useState<ProfileForm>(initial);
   const [editing, setEditing] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [removingAvatar, setRemovingAvatar] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -144,6 +146,34 @@ export function ProfilePage() {
     } finally {
       setUploadingAvatar(false);
       if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!user?.avatar) return;
+    if (!accessToken) {
+      toast.error("Please log in to update your photo.");
+      return;
+    }
+    if (!confirm("Remove your profile picture?")) return;
+
+    setRemovingAvatar(true);
+    try {
+      const res = await fetch("http://localhost:5001/api/users/me/avatar", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        toast.error(json.message || "Failed to remove photo.");
+        return;
+      }
+      updateUser({ avatar: "" });
+      toast.success("Profile picture removed.");
+    } catch {
+      toast.error("Network error. Please try again.");
+    } finally {
+      setRemovingAvatar(false);
     }
   };
 
@@ -232,6 +262,21 @@ export function ProfilePage() {
                       )}
                     </button>
                   </>
+                )}
+                {editing && user?.avatar && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveAvatar}
+                    disabled={removingAvatar}
+                    aria-label="Remove photo"
+                    className="absolute -top-1.5 -right-1.5 flex h-8 w-8 items-center justify-center rounded-xl bg-red-500 text-white shadow-md transition hover:bg-red-600 cursor-pointer disabled:opacity-60"
+                  >
+                    {removingAvatar ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </button>
                 )}
               </div>
               <div className="pb-1">

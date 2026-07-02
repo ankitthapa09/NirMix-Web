@@ -30,3 +30,7 @@ export async function deleteUser(id: string): Promise<IUser | null> {
 export async function findUserByEmail_WithPassword(email: string): Promise<IUser | null> {
   return User.findOne({ email: email.toLowerCase() }).select('+password');
 }
+
+export async function findUserById_WithPassword(id: string): Promise<IUser | null> {
+  return User.findById(id).select('+password');
+}
