@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { AUTH_REFRESHED_EVENT, AUTH_EXPIRED_EVENT } from "./api-client";
 
 export interface User {
   id: string;
@@ -49,6 +50,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
     }, 0);
   }, []);
+
+  // React to token changes driven by apiFetch's transparent refresh flow.
+  useEffect(() => {
+    const onRefreshed = (e: Event) => {
+      const token = (e as CustomEvent<{ accessToken: string }>).detail?.accessToken;
+      if (token) setAccessToken(token);
+    };
+    const onExpired = () => {
+      localStorage.removeItem("nirmix_token");
+      localStorage.removeItem("nirmix_refresh_token");
+      localStorage.removeItem("nirmix_user");
+      setAccessToken(null);
+      setUser(null);
+      toast.error("Your session has expired. Please log in again.");
+      router.push("/login");
+    };
+    window.addEventListener(AUTH_REFRESHED_EVENT, onRefreshed);
+    window.addEventListener(AUTH_EXPIRED_EVENT, onExpired);
+    return () => {
+      window.removeEventListener(AUTH_REFRESHED_EVENT, onRefreshed);
+      window.removeEventListener(AUTH_EXPIRED_EVENT, onExpired);
+    };
+  }, [router]);
 
   const login = (token: string, refreshToken: string, userData: User) => {
     localStorage.setItem("nirmix_token", token);
