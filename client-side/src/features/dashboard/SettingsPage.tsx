@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth-context";
 import {
   ShieldCheck,
   Bell,
@@ -162,10 +163,12 @@ function Shell({
 /* ───────────────────────── page ───────────────────────── */
 
 export function SettingsPage() {
+  const { accessToken } = useAuth();
   const [active, setActive] = useState<SectionId>("security");
 
   // ── state buckets ──
   const [pwd, setPwd] = useState({ current: "", next: "", confirm: "" });
+  const [savingPwd, setSavingPwd] = useState(false);
   const [twoFA, setTwoFA] = useState(false);
   const [loginAlerts, setLoginAlerts] = useState(true);
 
@@ -207,12 +210,33 @@ export function SettingsPage() {
 
   const save = (label: string) => toast.success(`${label} updated.`);
 
-  const savePassword = () => {
+  const savePassword = async () => {
     if (!pwd.current || !pwd.next || !pwd.confirm) return toast.error("Fill in all password fields.");
     if (pwd.next.length < 8) return toast.error("New password must be at least 8 characters.");
     if (pwd.next !== pwd.confirm) return toast.error("New passwords do not match.");
-    setPwd({ current: "", next: "", confirm: "" });
-    toast.success("Password changed.");
+    if (pwd.next === pwd.current) return toast.error("New password must be different from the current one.");
+    if (!accessToken) return toast.error("Please sign in again to change your password.");
+    if (savingPwd) return;
+
+    setSavingPwd(true);
+    try {
+      const res = await fetch("http://localhost:5001/api/users/me/password", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ currentPassword: pwd.current, newPassword: pwd.next }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        toast.error(json.message || "Failed to update password.");
+        return;
+      }
+      setPwd({ current: "", next: "", confirm: "" });
+      toast.success("Password changed.");
+    } catch {
+      toast.error("Network error. Please try again.");
+    } finally {
+      setSavingPwd(false);
+    }
   };
 
   return (
@@ -271,7 +295,7 @@ export function SettingsPage() {
         <div className="min-w-0">
           {active === "security" && (
             <div className="space-y-6">
-              <Shell title="Password" desc="Use a strong password you don't use elsewhere." onSave={savePassword} saveLabel="Update password">
+              <Shell title="Password" desc="Use a strong password you don't use elsewhere." onSave={savePassword} saveLabel={savingPwd ? "Updating…" : "Update password"}>
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                   <div className="sm:col-span-2 sm:max-w-sm">
                     <Field label="Current password">

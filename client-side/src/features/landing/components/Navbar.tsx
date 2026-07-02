@@ -21,6 +21,8 @@ import {
   Briefcase,
   Store,
   ArrowRight,
+  Calculator,
+  TrendingUp,
 } from "lucide-react";
 import { siteConfig } from "@/config/site.config";
 import { useAuth } from "@/lib/auth-context";
@@ -95,6 +97,82 @@ function NavDropdown({ label, mode }: { label: string; mode: ListingMode }) {
   );
 }
 
+interface ServiceLink {
+  label: string;
+  desc: string;
+  href: string;
+  icon: typeof Calculator;
+}
+
+const SERVICE_LINKS: ServiceLink[] = [
+  {
+    label: "Calculators",
+    desc: "Material, cost, concrete, EMI & more",
+    href: "/services/calculators",
+    icon: Calculator,
+  },
+  {
+    label: "Property Valuation",
+    desc: "Estimate your property's market value",
+    href: "/services/valuation",
+    icon: TrendingUp,
+  },
+];
+
+function ServiceItem({ item, accent }: { item: ServiceLink; accent: string }) {
+  const Icon = item.icon;
+  return (
+    <Link
+      href={item.href}
+      className="group/i flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold normal-case text-[#342417] transition hover:bg-white"
+    >
+      <span
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+        style={{ backgroundColor: `${accent}14`, color: accent }}
+      >
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="flex min-w-0 flex-col">
+        <span>{item.label}</span>
+        <span className="truncate text-[11px] font-medium text-slate/55">{item.desc}</span>
+      </span>
+      <ChevronRight className="ml-auto h-3.5 w-3.5 shrink-0 text-slate/30 transition group-hover/i:translate-x-0.5 group-hover/i:text-slate/60" />
+    </Link>
+  );
+}
+
+function ServicesDropdown() {
+  const accent = "#B0892E";
+
+  return (
+    <div className="group relative">
+      {/* Hover-only label; only the dropdown items navigate. */}
+      <span className="flex select-none items-center gap-0.5 cursor-default hover:text-ember transition-colors">
+        Services
+        <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 group-hover:rotate-180" />
+      </span>
+
+      <div className="invisible absolute left-1/2 top-full z-50 w-72 -translate-x-1/2 translate-y-1 pt-4 opacity-0 transition-all duration-200 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
+        <div className="overflow-hidden rounded-2xl border border-mist bg-[#FBF7EF]/98 shadow-[0_20px_50px_rgba(52,36,23,0.22)] ring-1 ring-black/5 backdrop-blur-xl">
+          <div className="border-b border-mist px-4 py-3">
+            <p className="text-[10px] font-extrabold uppercase tracking-[0.18em]" style={{ color: accent }}>
+              Services
+            </p>
+            <p className="mt-0.5 text-[11px] font-medium normal-case text-slate/70">
+              Tools to plan your property journey
+            </p>
+          </div>
+          <div className="p-2">
+            {SERVICE_LINKS.map((s) => (
+              <ServiceItem key={s.href} item={s} accent={accent} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -142,10 +220,7 @@ export function Navbar() {
             <Link href="/agents" className="hover:text-ember transition-colors">
               Agents
             </Link>
-            <div className="flex items-center gap-0.5 cursor-pointer hover:text-ember transition-colors">
-              <span>Services</span>
-              <ChevronDown className="h-3.5 w-3.5" />
-            </div>
+            <ServicesDropdown />
           </nav>
 
           {/* Right Actions */}
@@ -309,6 +384,24 @@ export function Navbar() {
                   {item.label}
                 </Link>
               ))}
+
+              <p className="px-4 pb-1 pt-3 text-[11px] font-bold uppercase tracking-wider text-slate/50">
+                Services
+              </p>
+              {SERVICE_LINKS.map((s) => {
+                const Icon = s.icon;
+                return (
+                  <Link
+                    key={s.href}
+                    href={s.href}
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-slate transition-colors hover:bg-sand hover:text-ember"
+                  >
+                    <Icon className="h-4 w-4 text-[#B0892E]" />
+                    {s.label}
+                  </Link>
+                );
+              })}
             </nav>
             <div className="mt-4 flex flex-col gap-3 border-t border-mist pt-4">
               {isAuthenticated && user ? (

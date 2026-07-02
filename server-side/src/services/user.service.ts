@@ -1,6 +1,6 @@
 import { UploadApiResponse } from 'cloudinary';
 import { cloudinary } from '../config/cloudinary.js';
-import { updateUser } from '../repositories/user.repository.js';
+import { updateUser, findUserById, findUserById_WithPassword } from '../repositories/user.repository.js';
 import { ApiError } from '../utils/ApiError.js';
 import { HTTP_STATUS } from '../constants/httpStatus.js';
 
@@ -59,6 +59,54 @@ class UserService {
       avatar: user.avatar,
       isEmailVerified: user.isEmailVerified,
     };
+  }
+
+  /**
+   * Remove the authenticated user's profile picture (Cloudinary + DB).
+   */
+  async removeAvatar(userId: string): Promise<SafeUser> {
+    const user = await findUserById(userId);
+    if (!user) {
+      throw new ApiError(HTTP_STATUS.NOT_FOUND, 'User not found');
+    }
+
+    if (user.avatar) {
+      // Avatars are stored at nirmix/avatars/<userId> (per-user public_id).
+      await cloudinary.uploader.destroy(`nirmix/avatars/${userId}`).catch(() => undefined);
+    }
+
+    const updated = await updateUser(userId, { avatar: '' });
+    if (!updated) {
+      throw new ApiError(HTTP_STATUS.NOT_FOUND, 'User not found');
+    }
+
+    return {
+      id: updated._id.toString(),
+      name: updated.name,
+      email: updated.email,
+      contact: updated.contact,
+      avatar: updated.avatar,
+      isEmailVerified: updated.isEmailVerified,
+    };
+  }
+
+  /**
+   * Change the authenticated user's password after verifying the current one.
+   */
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    const user = await findUserById_WithPassword(userId);
+    if (!user) {
+      throw new ApiError(HTTP_STATUS.NOT_FOUND, 'User not found');
+    }
+
+    const isValid = await user.comparePassword(currentPassword);
+    if (!isValid) {
+      throw new ApiError(HTTP_STATUS.UNAUTHORIZED, 'Current password is incorrect');
+    }
+
+    // Assigning triggers the schema's pre-save hook, which hashes the password.
+    user.password = newPassword;
+    await user.save();
   }
 }
 
