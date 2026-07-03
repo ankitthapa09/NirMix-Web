@@ -31,6 +31,12 @@ const fileFilter = (
     return cb(new ApiError(HTTP_STATUS.BAD_REQUEST, 'Avatar must be an image file'));
   }
 
+  if (file.fieldname === 'coverImage' || file.fieldname === 'projectImages') {
+    // Portfolio cover and project work samples must be images.
+    if (file.mimetype.startsWith('image/')) return cb(null, true);
+    return cb(new ApiError(HTTP_STATUS.BAD_REQUEST, 'Portfolio images must be image files'));
+  }
+
   return cb(new ApiError(HTTP_STATUS.BAD_REQUEST, `Unexpected file field: ${file.fieldname}`));
 };
 
@@ -39,7 +45,7 @@ const upload = multer({
   fileFilter,
   limits: {
     fileSize: 10 * 1024 * 1024, // 10 MB per file (matches server.ts body limit)
-    files: 13,                  // up to 12 photos + 1 floor plan
+    files: 32,                  // covers property (12+1) and portfolio (1 cover + 30 work images)
   },
 });
 
@@ -51,3 +57,9 @@ export const uploadPropertyMedia = upload.fields([
 
 // Accepts a single `avatar` image file for profile picture uploads.
 export const uploadAvatar = upload.single('avatar');
+
+// Accepts: coverImage (max 1), projectImages[] (max 30), and text fields (e.g. `data`).
+export const uploadPortfolioMedia = upload.fields([
+  { name: 'coverImage', maxCount: 1 },
+  { name: 'projectImages', maxCount: 30 },
+]);
