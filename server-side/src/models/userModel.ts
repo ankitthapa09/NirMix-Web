@@ -3,17 +3,23 @@ import bcrypt from 'bcryptjs';
 import { ALL_Portfolio_ROLES, PortfolioRole } from "../constants/portfolioRoles";
 
 export interface IUser extends Document{
-    // core identity 
+    // core identity
     name: string;
+    displayName?: string;
     email: string;
     password: string;
     contact: string;
     avatar: string;
+    dob?: string;
+    gender?: string;
+    citizenshipNo?: string;
 
     address?: {
-        district: string;
+        province?: string;
+        district?: string;
         municipality?: string;
         ward?: string;
+        tole?: string;
     };
 
     hasPostedProperty: boolean;
@@ -22,6 +28,7 @@ export interface IUser extends Document{
 
     isAdmim: boolean;
     isEmailVerified: boolean;
+    isVerified: boolean;
     isActive: boolean;
 
     refreshToken?: string;
@@ -43,6 +50,12 @@ const userSchema = new Schema <IUser>(
             trim: true,
             minlength:[2, 'Name must be at least 2 characters'],
             maxLength: [80, 'Name must be at most 80 characters']
+        },
+
+        displayName: {
+            type: String,
+            trim: true,
+            maxLength: [80, 'Display name must be at most 80 characters'],
         },
 
         email: {
@@ -70,7 +83,25 @@ const userSchema = new Schema <IUser>(
             type: String,
         },
 
+        dob: {
+            type: String,
+            trim: true,
+        },
+        gender: {
+            type: String,
+            trim: true,
+        },
+        citizenshipNo: {
+            type: String,
+            trim: true,
+            select: false, // sensitive — only used for verification
+        },
+
         address: {
+            province: {
+                type: String,
+                trim: true,
+            },
             district: {
                 type: String,
                 trim: true,
@@ -82,6 +113,10 @@ const userSchema = new Schema <IUser>(
             ward: {
                 type: String,
                 trim: true
+            },
+            tole: {
+                type: String,
+                trim: true,
             }
         },
 
@@ -109,7 +144,13 @@ const userSchema = new Schema <IUser>(
             type: Boolean,
             default: false
         },
-        
+
+        // Set once identity (citizenship/PAN + credentials) is checked; drives the Verified badge.
+        isVerified: {
+            type: Boolean,
+            default: false
+        },
+
         isActive: {
             type: Boolean,
             default: true
