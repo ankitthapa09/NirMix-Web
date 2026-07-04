@@ -1,7 +1,8 @@
 import Portfolio, { IPortfolio } from '../models/portfolioModel.js';
 import { PortfolioRole } from '../constants/portfolioRoles.js';
 
-const OWNER_PUBLIC_FIELDS = 'name avatar contact email isProfessional isEmailVerified';
+const OWNER_PUBLIC_FIELDS =
+  'name displayName avatar contact email address isVerified isProfessional isEmailVerified';
 
 /**
  * Persist a new portfolio.
