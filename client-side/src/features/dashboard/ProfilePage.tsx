@@ -1,144 +1,95 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
-  Pencil,
-  Check,
-  X,
-  Camera,
-  MapPin,
-  Mail,
-  Phone,
-  Globe,
-  CalendarDays,
-  BadgeCheck,
-  ShieldCheck,
-  Briefcase,
-  Award,
-  Languages as LanguagesIcon,
-  Building2,
-  User as UserIcon,
-  Home,
-  Eye,
-  Heart,
-  Star,
-  Settings,
-  Link2,
-  AtSign,
-  MessageCircle,
-  Clock,
-  Loader2,
-  Trash2,
+  Camera, Trash2, Loader2, Mail, Phone, BadgeCheck, Pencil, Eye, Plus,
+  Briefcase, KeyRound, Clock, Wallet, Languages as LangIcon, ArrowRight,
+  Globe, Link2, AtSign, MessageCircle, Play, Music2, ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api-client";
+import {
+  fetchMyPortfolio, deletePortfolio, type ApiPortfolio, type PortfolioSocials,
+} from "@/lib/portfolio-api";
+import { CATEGORY_LABELS, PORTFOLIO_SCHEMAS } from "@/lib/portfolio-schemas";
 
 const ACCENT = "#B05B33";
 
-const LANGUAGE_OPTIONS = ["English", "Nepali", "Hindi", "Newari", "Maithili"];
-const SPECIALIZATION_OPTIONS = [
-  "Residential",
-  "Commercial",
-  "Land & Plots",
-  "Luxury Homes",
-  "Rentals",
-  "Apartments",
-];
-
-const ACCOUNT_TYPES = ["Personal", "Agent", "Builder"] as const;
-
-const TYPE_TINT: Record<string, string> = {
-  Personal: "#157A74",
-  Agent: "#B05B33",
-  Builder: "#7A5418",
+const SOCIAL_META: Record<keyof PortfolioSocials, { label: string; icon: typeof Globe }> = {
+  website: { label: "Website", icon: Globe },
+  facebook: { label: "Facebook", icon: Link2 },
+  instagram: { label: "Instagram", icon: AtSign },
+  linkedin: { label: "LinkedIn", icon: Link2 },
+  youtube: { label: "YouTube", icon: Play },
+  tiktok: { label: "TikTok", icon: Music2 },
+  viber: { label: "Viber", icon: MessageCircle },
+  whatsapp: { label: "WhatsApp", icon: MessageCircle },
+  behance: { label: "Behance", icon: Link2 },
 };
 
-const TYPE_ICON: Record<string, typeof UserIcon> = {
-  Personal: UserIcon,
-  Agent: Briefcase,
-  Builder: Building2,
-};
-
-interface ProfileForm {
-  name: string;
-  accountType: string;
-  email: string;
-  phone: string;
-  city: string;
-  address: string;
-  bio: string;
-  languages: string[];
-  // professional
-  company: string;
-  license: string;
-  experience: string;
-  specializations: string[];
-  serviceAreas: string;
-  // social
-  website: string;
-  facebook: string;
-  instagram: string;
-  whatsapp: string;
-  memberSince: string;
+function socialHref(key: keyof PortfolioSocials, value: string): string {
+  if (key === "whatsapp") return `https://wa.me/${value.replace(/[^\d]/g, "")}`;
+  if (key === "viber") return `viber://chat?number=${value.replace(/[^\d+]/g, "")}`;
+  if (/^https?:\/\//i.test(value)) return value;
+  return `https://${value}`;
 }
 
-const inputCls =
-  "w-full rounded-xl border border-[#E0D4C5] bg-[#FAF7F2] px-3.5 py-2.5 text-sm font-medium text-[#342417] placeholder-[#5C4D3C]/40 outline-none transition focus:border-[#B05B33]/40 focus:bg-white focus:ring-2 focus:ring-[#B05B33]/10";
+function displayDetail(value: unknown): string | null {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (Array.isArray(value)) return value.length ? value.join(", ") : null;
+  return String(value);
+}
+
+function Card({ title, action, children }: { title?: string; action?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-mist bg-white p-5 shadow-[0_1px_2px_rgba(46,33,22,0.04)] sm:p-6">
+      {title && (
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="text-sm font-extrabold uppercase tracking-wide text-[#342417]/70">{title}</h2>
+          {action}
+        </div>
+      )}
+      {children}
+    </section>
+  );
+}
 
 export function ProfilePage() {
+  const router = useRouter();
   const { user, updateUser, accessToken } = useAuth();
 
-  const initial: ProfileForm = {
-    name: user?.name ?? "Ram Thapa",
-    accountType: "Agent",
-    email: user?.email ?? "ram@example.com",
-    phone: user?.contact ?? "+977 9801234567",
-    city: "Lalitpur",
-    address: "Bhaisepati, Ward 5, Lalitpur",
-    bio: "Helping families find the right home across the Kathmandu valley. Specialising in verified residential listings with transparent pricing and end-to-end support.",
-    languages: ["English", "Nepali"],
-    company: "NirMix Premium",
-    license: "NP-RE-2024-1182",
-    experience: "6",
-    specializations: ["Residential", "Luxury Homes", "Apartments"],
-    serviceAreas: "Lalitpur, Kathmandu, Bhaktapur",
-    website: "https://nirmix.com.np",
-    facebook: "nirmix",
-    instagram: "nirmix.realty",
-    whatsapp: "+977 9801234567",
-    memberSince: "Jan 2024",
-  };
-
-  const [form, setForm] = useState<ProfileForm>(initial);
-  const [draft, setDraft] = useState<ProfileForm>(initial);
-  const [editing, setEditing] = useState(false);
+  const [portfolio, setPortfolio] = useState<ApiPortfolio | null>(null);
+  const [loadingPf, setLoadingPf] = useState(true);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [removingAvatar, setRemovingAvatar] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetchMyPortfolio()
+      .then((data) => { if (active) setPortfolio(data); })
+      .catch(() => { /* leave null → shows create CTA */ })
+      .finally(() => { if (active) setLoadingPf(false); });
+    return () => { active = false; };
+  }, []);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!accessToken) {
-      toast.error("Please log in to update your photo.");
-      return;
-    }
-
+    if (!accessToken) return toast.error("Please log in to update your photo.");
     setUploadingAvatar(true);
     try {
       const fd = new FormData();
       fd.append("avatar", file);
-      const res = await apiFetch("http://localhost:5001/api/users/me/avatar", {
-        method: "PATCH",
-        body: fd,
-      });
+      const res = await apiFetch("http://localhost:5001/api/users/me/avatar", { method: "PATCH", body: fd });
       const json = await res.json();
-      if (!res.ok) {
-        toast.error(json.message || "Failed to update photo.");
-        return;
-      }
+      if (!res.ok) return toast.error(json.message || "Failed to update photo.");
       updateUser({ avatar: json.data.avatar });
       toast.success("Profile picture updated.");
     } catch {
@@ -150,23 +101,12 @@ export function ProfilePage() {
   };
 
   const handleRemoveAvatar = async () => {
-    if (!user?.avatar) return;
-    if (!accessToken) {
-      toast.error("Please log in to update your photo.");
-      return;
-    }
-    if (!confirm("Remove your profile picture?")) return;
-
+    if (!user?.avatar || !accessToken) return;
     setRemovingAvatar(true);
     try {
-      const res = await apiFetch("http://localhost:5001/api/users/me/avatar", {
-        method: "DELETE",
-      });
+      const res = await apiFetch("http://localhost:5001/api/users/me/avatar", { method: "DELETE" });
       const json = await res.json();
-      if (!res.ok) {
-        toast.error(json.message || "Failed to remove photo.");
-        return;
-      }
+      if (!res.ok) return toast.error(json.message || "Failed to remove photo.");
       updateUser({ avatar: "" });
       toast.success("Profile picture removed.");
     } catch {
@@ -176,479 +116,356 @@ export function ProfilePage() {
     }
   };
 
-  const v = editing ? draft : form;
-  const isPro = v.accountType !== "Personal";
-  const TypeIcon = TYPE_ICON[v.accountType] ?? UserIcon;
-  const typeTint = TYPE_TINT[v.accountType] ?? ACCENT;
-
-  const initials =
-    v.name
-      .split(" ")
-      .map((w) => w[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase() || "U";
-
-  const startEdit = () => {
-    setDraft(form);
-    setEditing(true);
-  };
-  const cancel = () => setEditing(false);
-  const saveAll = () => {
-    setForm(draft);
-    setEditing(false);
-    toast.success("Profile updated.");
+  const handleDeletePortfolio = async () => {
+    if (!portfolio) return;
+    setDeleting(true);
+    try {
+      await deletePortfolio(portfolio._id);
+      setPortfolio(null);
+      setConfirmDelete(false);
+      toast.success("Portfolio deleted.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete portfolio.");
+    } finally {
+      setDeleting(false);
+    }
   };
 
-  const setDraftField = <K extends keyof ProfileForm>(key: K, value: ProfileForm[K]) =>
-    setDraft((d) => ({ ...d, [key]: value }));
+  const name = user?.name ?? "Your name";
+  const initials = name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "U";
 
-  const toggleInArray = (key: "languages" | "specializations", item: string) =>
-    setDraft((d) => ({
-      ...d,
-      [key]: d[key].includes(item) ? d[key].filter((x) => x !== item) : [...d[key], item],
-    }));
+  const detailRows = portfolio
+    ? PORTFOLIO_SCHEMAS[portfolio.category]
+        .flatMap((s) => s.fields)
+        .map((f) => ({ label: f.label, value: displayDetail(portfolio.details?.[f.key]) }))
+        .filter((r): r is { label: string; value: string } => r.value !== null)
+    : [];
 
-  // crude profile completeness
+  const socials = portfolio
+    ? (Object.keys(SOCIAL_META) as (keyof PortfolioSocials)[])
+        .map((k) => ({ key: k, value: portfolio.socials?.[k]?.trim() }))
+        .filter((s): s is { key: keyof PortfolioSocials; value: string } => !!s.value)
+    : [];
+
+  const feeText = portfolio
+    ? [portfolio.feeModel, portfolio.feeAmount != null ? `NPR ${portfolio.feeAmount.toLocaleString()}` : ""].filter(Boolean).join(" · ")
+    : "";
+
+  // Profile completeness (real signals from the portfolio + account).
   const completeness = (() => {
-    const checks = [v.bio, v.phone, v.city, v.address, v.languages.length > 0, isPro ? v.company : "x", v.website];
-    const done = checks.filter(Boolean).length;
-    return Math.round((done / checks.length) * 100);
+    const checks = [
+      !!user?.avatar,
+      !!portfolio,
+      !!portfolio?.bio,
+      (portfolio?.projects?.length ?? 0) > 0,
+      (portfolio?.serviceAreas?.length ?? 0) > 0,
+      (portfolio?.languages?.length ?? 0) > 0,
+      socials.length > 0,
+    ];
+    return Math.round((checks.filter(Boolean).length / checks.length) * 100);
   })();
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-      {/* ── Cover + identity ── */}
-      <div className="overflow-hidden rounded-3xl border border-[#E8DECF] bg-white shadow-[0_18px_50px_-26px_rgba(52,36,23,0.4)]">
-        <div className="relative h-36 sm:h-44">
-          <div className="absolute inset-0 bg-gradient-to-r from-[#342417] via-[#5C4D3C] to-[#342417]" />
-          <div className="absolute inset-0 opacity-[0.12] bg-[radial-gradient(circle_at_center,#FFFFFF_1.5px,transparent_1.5px)] bg-[size:20px_20px]" />
-          <div className="absolute inset-0" style={{ background: `radial-gradient(120% 120% at 90% 0%, ${ACCENT}55, transparent 55%)` }} />
+    <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
+      {/* ── Header card ── */}
+      <div className="overflow-hidden rounded-3xl border border-mist bg-white shadow-[0_24px_60px_-30px_rgba(52,36,23,0.5)]">
+        <div className="relative h-40 sm:h-48">
+          <div className="absolute inset-0 bg-gradient-to-br from-[#211507] via-[#2E2116] to-[#3a2917]" />
+          {portfolio?.coverImage?.url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={portfolio.coverImage.url} alt="" className="absolute inset-0 h-full w-full object-cover opacity-30" />
+          )}
+          <div className="absolute inset-0" style={{ background: `radial-gradient(90% 100% at 88% 0%, ${ACCENT}66, transparent 55%)` }} />
+          <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white/95 to-transparent" />
         </div>
 
-        <div className="px-5 pb-5 sm:px-7 sm:pb-7">
+        <div className="px-5 pb-6 sm:px-7">
           <div className="-mt-12 flex flex-col gap-4 sm:-mt-14 sm:flex-row sm:items-end sm:justify-between">
             <div className="flex items-end gap-4">
-              <div className="relative">
+              {/* Avatar with always-available upload/remove */}
+              <div className="group relative">
                 <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-3xl border-4 border-white bg-[#342417] text-2xl font-extrabold text-white shadow-lg sm:h-28 sm:w-28">
                   {user?.avatar ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={user.avatar} alt={v.name} className="h-full w-full object-cover" />
+                    <img src={user.avatar} alt={name} className="h-full w-full object-cover" />
                   ) : (
                     initials
                   )}
                 </div>
-                {editing && (
-                  <>
-                    <input
-                      ref={avatarInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleAvatarUpload}
-                      className="hidden"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => avatarInputRef.current?.click()}
-                      disabled={uploadingAvatar}
-                      className="absolute -bottom-1.5 -right-1.5 flex h-8 w-8 items-center justify-center rounded-xl text-white shadow-md cursor-pointer disabled:opacity-60"
-                      style={{ backgroundColor: ACCENT }}
-                    >
-                      {uploadingAvatar ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Camera className="h-4 w-4" />
-                      )}
-                    </button>
-                  </>
-                )}
-                {editing && user?.avatar && (
+                <input ref={avatarInputRef} type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={uploadingAvatar}
+                  aria-label="Change photo"
+                  className="absolute -bottom-1.5 -right-1.5 flex h-8 w-8 items-center justify-center rounded-xl text-white shadow-md transition hover:brightness-110 disabled:opacity-60"
+                  style={{ backgroundColor: ACCENT }}
+                >
+                  {uploadingAvatar ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                </button>
+                {user?.avatar && (
                   <button
                     type="button"
                     onClick={handleRemoveAvatar}
                     disabled={removingAvatar}
                     aria-label="Remove photo"
-                    className="absolute -top-1.5 -right-1.5 flex h-8 w-8 items-center justify-center rounded-xl bg-red-500 text-white shadow-md transition hover:bg-red-600 cursor-pointer disabled:opacity-60"
+                    className="absolute -top-1.5 -right-1.5 flex h-8 w-8 items-center justify-center rounded-xl bg-red-500 text-white opacity-0 shadow-md transition hover:bg-red-600 group-hover:opacity-100 disabled:opacity-60"
                   >
-                    {removingAvatar ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
+                    {removingAvatar ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                   </button>
                 )}
               </div>
+
               <div className="pb-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  {editing ? (
-                    <input
-                      className={`${inputCls} max-w-xs text-lg font-extrabold`}
-                      value={draft.name}
-                      onChange={(e) => setDraftField("name", e.target.value)}
-                    />
-                  ) : (
-                    <h1 className="text-2xl font-extrabold tracking-tight text-[#342417]">{form.name}</h1>
-                  )}
-                  <span
-                    className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-extrabold"
-                    style={{ backgroundColor: `${typeTint}1a`, color: typeTint }}
-                  >
-                    <TypeIcon className="h-3.5 w-3.5" />
-                    {v.accountType}
-                  </span>
+                  <h1 className="text-2xl font-extrabold tracking-tight text-[#342417]">{name}</h1>
                   {user?.isEmailVerified && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-extrabold text-emerald-700">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[#157A74]/10 px-2 py-0.5 text-[11px] font-bold text-[#157A74]">
                       <BadgeCheck className="h-3.5 w-3.5" /> Verified
                     </span>
                   )}
                 </div>
-                <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#5C4D3C]/75">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-3.5 w-3.5" /> {v.city}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <CalendarDays className="h-3.5 w-3.5" /> Member since {v.memberSince}
-                  </span>
-                  {isPro && v.company && (
-                    <span className="flex items-center gap-1">
-                      <Briefcase className="h-3.5 w-3.5" /> {v.company}
-                    </span>
-                  )}
-                </p>
+                {portfolio ? (
+                  <p className="mt-0.5 inline-flex items-center gap-1.5 text-sm font-semibold" style={{ color: ACCENT }}>
+                    <Briefcase className="h-4 w-4" /> {CATEGORY_LABELS[portfolio.category]}
+                    {portfolio.availability && (
+                      <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-sand/70 px-2 py-0.5 text-[11px] font-bold text-[#5C4D3C]">
+                        <span className={`h-1.5 w-1.5 rounded-full ${portfolio.availability === "Available" ? "bg-emerald-500" : "bg-[#C9A24B]"}`} />
+                        {portfolio.availability}
+                      </span>
+                    )}
+                  </p>
+                ) : (
+                  <p className="mt-0.5 text-sm text-[#5C4D3C]/70">Personal account</p>
+                )}
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-[#5C4D3C]/75">
+                  {user?.email && <span className="inline-flex items-center gap-1"><Mail className="h-3.5 w-3.5" /> {user.email}</span>}
+                  {user?.contact && <span className="inline-flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> {user.contact}</span>}
+                </div>
               </div>
             </div>
 
-            {/* Actions */}
-            <div className="flex shrink-0 items-center gap-2">
-              {editing ? (
+            {/* Primary actions */}
+            <div className="flex flex-wrap gap-2.5 pb-1">
+              {portfolio ? (
                 <>
-                  <button
-                    type="button"
-                    onClick={cancel}
-                    className="flex items-center gap-1.5 rounded-xl border border-[#E0D4C5] bg-white px-4 py-2.5 text-sm font-bold text-[#342417] transition hover:border-[#342417]/25 cursor-pointer"
-                  >
-                    <X className="h-4 w-4" /> Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={saveAll}
-                    className="flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-bold text-white shadow-md transition hover:brightness-105 cursor-pointer"
-                    style={{ backgroundColor: ACCENT }}
-                  >
-                    <Check className="h-4 w-4" /> Save changes
+                  <Link href={`/professionals/${portfolio._id}`} className="inline-flex items-center gap-1.5 rounded-xl border border-mist bg-white px-4 py-2.5 text-[13px] font-bold text-[#342417] transition hover:border-[#C9B79F]">
+                    <Eye className="h-4 w-4" /> View public
+                  </Link>
+                  <button onClick={() => router.push("/dashboard/create-portfolio")} className="inline-flex items-center gap-1.5 rounded-xl bg-[#B05B33] px-4 py-2.5 text-[13px] font-bold text-white transition hover:bg-[#9a4c28]">
+                    <Pencil className="h-4 w-4" /> Edit portfolio
                   </button>
                 </>
               ) : (
-                <>
-                  <Link
-                    href="/dashboard/settings"
-                    className="flex items-center gap-1.5 rounded-xl border border-[#E0D4C5] bg-white px-4 py-2.5 text-sm font-bold text-[#342417] transition hover:border-[#342417]/25 cursor-pointer"
-                  >
-                    <Settings className="h-4 w-4" /> Settings
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={startEdit}
-                    className="flex items-center gap-1.5 rounded-xl bg-[#342417] px-4 py-2.5 text-sm font-bold text-white shadow-md transition hover:bg-[#251910] cursor-pointer"
-                  >
-                    <Pencil className="h-4 w-4" /> Edit Profile
-                  </button>
-                </>
+                <Link href="/dashboard/create-portfolio" className="inline-flex items-center gap-1.5 rounded-xl bg-[#B05B33] px-4 py-2.5 text-[13px] font-bold text-white transition hover:bg-[#9a4c28]">
+                  <Plus className="h-4 w-4" /> Create portfolio
+                </Link>
               )}
             </div>
           </div>
 
-          {/* Stats */}
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat icon={Home} label="Active listings" value="12" />
-            <Stat icon={Eye} label="Profile views" value="3.4k" />
-            <Stat icon={Heart} label="Saved by" value="287" />
-            <Stat icon={Star} label="Rating" value="4.8" sub="· 41 reviews" />
-          </div>
+          {portfolio?.headline && (
+            <p className="mt-4 max-w-2xl border-t border-mist pt-4 text-[15px] leading-relaxed text-[#5C4D3C]">
+              {portfolio.headline}
+            </p>
+          )}
         </div>
       </div>
 
       {/* ── Body ── */}
-      <div className="mt-6 flex flex-col gap-6 lg:grid lg:grid-cols-[1fr_320px] lg:gap-8">
-        {/* Left */}
-        <div className="min-w-0 space-y-6">
-          {/* About */}
-          <Card title="About" icon={UserIcon}>
-            {editing ? (
-              <textarea
-                rows={4}
-                className={`${inputCls} resize-none`}
-                value={draft.bio}
-                onChange={(e) => setDraftField("bio", e.target.value)}
-                placeholder="Write a short bio…"
-              />
-            ) : (
-              <p className="text-sm leading-relaxed text-[#5C4D3C]">{form.bio || "No bio added yet."}</p>
-            )}
-          </Card>
-
-          {/* Professional details */}
-          {isPro && (
-            <Card title="Professional details" icon={Award} accent={typeTint}>
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                <FormRow label="Company / Agency" editing={editing} value={v.company}>
-                  <input className={inputCls} value={draft.company} onChange={(e) => setDraftField("company", e.target.value)} />
-                </FormRow>
-                <FormRow label="License / Reg. number" editing={editing} value={v.license}>
-                  <input className={inputCls} value={draft.license} onChange={(e) => setDraftField("license", e.target.value)} />
-                </FormRow>
-                <FormRow label="Experience" editing={editing} value={`${v.experience} years`}>
-                  <input type="number" className={inputCls} value={draft.experience} onChange={(e) => setDraftField("experience", e.target.value)} />
-                </FormRow>
-                <FormRow label="Service areas" editing={editing} value={v.serviceAreas}>
-                  <input className={inputCls} value={draft.serviceAreas} onChange={(e) => setDraftField("serviceAreas", e.target.value)} />
-                </FormRow>
-              </div>
-
-              <div className="mt-5">
-                <p className="mb-2 text-xs font-bold text-[#5C4D3C]/80">Specializations</p>
-                {editing ? (
-                  <ChipSelect options={SPECIALIZATION_OPTIONS} selected={draft.specializations} onToggle={(s) => toggleInArray("specializations", s)} />
-                ) : (
-                  <ChipList items={form.specializations} />
-                )}
-              </div>
-            </Card>
-          )}
-
-          {/* Contact info */}
-          <Card title="Contact information" icon={Phone}>
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-              <FormRow label="Email" editing={editing} value={v.email} icon={Mail}>
-                <input className={inputCls} value={draft.email} onChange={(e) => setDraftField("email", e.target.value)} />
-              </FormRow>
-              <FormRow label="Phone" editing={editing} value={v.phone} icon={Phone}>
-                <input className={inputCls} value={draft.phone} onChange={(e) => setDraftField("phone", e.target.value)} />
-              </FormRow>
-              <FormRow label="City" editing={editing} value={v.city} icon={MapPin}>
-                <input className={inputCls} value={draft.city} onChange={(e) => setDraftField("city", e.target.value)} />
-              </FormRow>
-              <FormRow label="Address" editing={editing} value={v.address} icon={MapPin}>
-                <input className={inputCls} value={draft.address} onChange={(e) => setDraftField("address", e.target.value)} />
-              </FormRow>
-            </div>
-          </Card>
-
-          {/* Languages */}
-          <Card title="Languages spoken" icon={LanguagesIcon}>
-            {editing ? (
-              <ChipSelect options={LANGUAGE_OPTIONS} selected={draft.languages} onToggle={(l) => toggleInArray("languages", l)} />
-            ) : (
-              <ChipList items={form.languages} />
-            )}
-          </Card>
+      {loadingPf ? (
+        <div className="mt-6 flex items-center justify-center rounded-2xl border border-mist bg-white py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-[#B05B33]" />
         </div>
+      ) : (
+        <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
+          {/* Main */}
+          <div className="space-y-5 lg:col-span-2">
+            {portfolio ? (
+              <>
+                {portfolio.bio && (
+                  <Card title="About">
+                    <p className="whitespace-pre-line text-[14px] leading-relaxed text-[#5C4D3C]">{portfolio.bio}</p>
+                  </Card>
+                )}
 
-        {/* Right rail */}
-        <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
-          {/* Account type (edit) */}
-          {editing && (
-            <Card title="Account type">
-              <div className="flex flex-wrap gap-1.5">
-                {ACCOUNT_TYPES.map((t) => {
-                  const on = draft.accountType === t;
-                  return (
-                    <button key={t} type="button" onClick={() => setDraftField("accountType", t)} style={on ? { backgroundColor: ACCENT, color: "#fff" } : undefined} className={`rounded-lg border px-3 py-1.5 text-xs font-bold transition cursor-pointer ${on ? "border-transparent" : "border-[#E0D4C5] bg-white text-[#5C4D3C]/70 hover:text-[#342417]"}`}>
-                      {t}
-                    </button>
-                  );
-                })}
-              </div>
-            </Card>
-          )}
+                {detailRows.length > 0 && (
+                  <Card title="Expertise & credentials">
+                    <dl className="divide-y divide-mist/70">
+                      {detailRows.map((r) => (
+                        <div key={r.label} className="flex gap-3 py-2.5 text-[13px]">
+                          <dt className="w-44 shrink-0 font-semibold text-[#5C4D3C]/70">{r.label}</dt>
+                          <dd className="text-[#342417]">{r.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </Card>
+                )}
 
-          {/* Completeness */}
-          <div className="rounded-2xl border border-[#E8DECF] bg-white p-5 shadow-sm">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-sm font-bold text-[#342417]">Profile strength</p>
-              <span className="text-sm font-extrabold" style={{ color: ACCENT }}>{completeness}%</span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-[#EFE7D8]">
-              <div className="h-full rounded-full transition-all" style={{ width: `${completeness}%`, backgroundColor: ACCENT }} />
-            </div>
-            <p className="mt-2 text-[11px] text-[#5C4D3C]/65">
-              {completeness >= 100 ? "Your profile looks great!" : "Complete your profile to build buyer trust."}
-            </p>
-          </div>
-
-          {/* Verification */}
-          <Card title="Verification" icon={ShieldCheck} accent="#157A74">
-            <div className="space-y-3">
-              <VerifyRow label="Email address" done={!!user?.isEmailVerified} />
-              <VerifyRow label="Phone number" done />
-              <VerifyRow label="Identity (KYC)" done={false} actionLabel="Verify" />
-            </div>
-          </Card>
-
-          {/* Social */}
-          <Card title="Social & web" icon={Globe}>
-            {editing ? (
-              <div className="space-y-3">
-                <SocialInput icon={Globe} value={draft.website} onChange={(x) => setDraftField("website", x)} placeholder="Website URL" />
-                <SocialInput icon={Link2} value={draft.facebook} onChange={(x) => setDraftField("facebook", x)} placeholder="Facebook username" />
-                <SocialInput icon={AtSign} value={draft.instagram} onChange={(x) => setDraftField("instagram", x)} placeholder="Instagram handle" />
-                <SocialInput icon={MessageCircle} value={draft.whatsapp} onChange={(x) => setDraftField("whatsapp", x)} placeholder="WhatsApp number" />
-              </div>
+                {(portfolio.projects?.length ?? 0) > 0 && (
+                  <Card title="Work & projects">
+                    <div className="space-y-6">
+                      {portfolio.projects!.map((p, i) => (
+                        <article key={i} className="border-b border-mist/70 pb-6 last:border-b-0 last:pb-0">
+                          {p.images.length > 0 && (
+                            <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                              {p.images.map((img, j) => (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img key={j} src={img.url} alt={p.title || `Project ${i + 1}`} className="aspect-[4/3] w-full rounded-xl object-cover" />
+                              ))}
+                            </div>
+                          )}
+                          {p.title && <h3 className="text-[14px] font-bold text-[#342417]">{p.title}</h3>}
+                          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-[#5C4D3C]/70">
+                            {p.type && <span>{p.type}</span>}
+                            {p.district && <span>· {p.district}</span>}
+                            {p.year && <span>· {p.year}</span>}
+                          </div>
+                          {p.description && <p className="mt-2 text-[13px] leading-relaxed text-[#5C4D3C]">{p.description}</p>}
+                        </article>
+                      ))}
+                    </div>
+                  </Card>
+                )}
+              </>
             ) : (
-              <div className="space-y-2.5">
-                <SocialLink icon={Globe} label={form.website || "—"} />
-                <SocialLink icon={Link2} label={form.facebook ? `@${form.facebook}` : "—"} />
-                <SocialLink icon={AtSign} label={form.instagram ? `@${form.instagram}` : "—"} />
-                <SocialLink icon={MessageCircle} label={form.whatsapp || "—"} />
+              // No portfolio yet
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-mist bg-white/70 px-6 py-14 text-center">
+                <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl" style={{ backgroundColor: `${ACCENT}1a`, color: ACCENT }}>
+                  <Briefcase className="h-7 w-7" />
+                </span>
+                <h3 className="text-lg font-extrabold text-[#342417]">Create your professional portfolio</h3>
+                <p className="mt-1.5 max-w-sm text-sm text-[#5C4D3C]/70">
+                  Are you an engineer, architect, agent, interior designer or contractor? Publish a profile and get discovered by clients across Nepal.
+                </p>
+                <Link href="/dashboard/create-portfolio" className="mt-5 inline-flex items-center gap-1.5 rounded-xl bg-[#B05B33] px-5 py-2.5 text-xs font-bold text-white shadow-md transition hover:bg-[#9a4c28]">
+                  Get started <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
               </div>
             )}
-          </Card>
+          </div>
 
-          {/* Member since */}
-          <div className="flex items-center gap-3 rounded-2xl border border-[#E8DECF] bg-[#FBF7EF] p-4">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl" style={{ backgroundColor: `${ACCENT}14`, color: ACCENT }}>
-              <Clock className="h-4 w-4" />
-            </span>
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-wide text-[#5C4D3C]/55">Member since</p>
-              <p className="text-sm font-extrabold text-[#342417]">{v.memberSince}</p>
+          {/* Sidebar */}
+          <aside className="space-y-5">
+            {/* Completeness */}
+            <Card>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-[11px] font-extrabold uppercase tracking-wide text-[#5C4D3C]/60">Profile strength</span>
+                <span className="text-sm font-black" style={{ color: ACCENT }}>{completeness}%</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-sand">
+                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${completeness}%`, backgroundColor: ACCENT }} />
+              </div>
+            </Card>
+
+            {/* Account */}
+            <Card title="Account">
+              <dl className="space-y-2.5 text-[13px]">
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="inline-flex items-center gap-1.5 text-[#5C4D3C]/70"><Mail className="h-3.5 w-3.5" /> Email</dt>
+                  <dd className="truncate font-semibold text-[#342417]">{user?.email ?? "—"}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="inline-flex items-center gap-1.5 text-[#5C4D3C]/70"><Phone className="h-3.5 w-3.5" /> Phone</dt>
+                  <dd className="font-semibold text-[#342417]">{user?.contact ?? "—"}</dd>
+                </div>
+              </dl>
+              <Link href="/dashboard/settings" className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-mist bg-sand/40 px-3 py-2 text-[12px] font-bold text-[#342417] transition hover:border-[#C9B79F]">
+                <KeyRound className="h-3.5 w-3.5" /> Change password
+              </Link>
+            </Card>
+
+            {portfolio && (
+              <Card title="Quick facts">
+                <dl className="space-y-2.5 text-[13px]">
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="inline-flex items-center gap-1.5 text-[#5C4D3C]/70"><ShieldCheck className="h-3.5 w-3.5" /> Status</dt>
+                    <dd className="font-semibold capitalize text-[#342417]">{portfolio.status}</dd>
+                  </div>
+                  {portfolio.experienceYears != null && (
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="inline-flex items-center gap-1.5 text-[#5C4D3C]/70"><Clock className="h-3.5 w-3.5" /> Experience</dt>
+                      <dd className="font-semibold text-[#342417]">{portfolio.experienceYears} yrs</dd>
+                    </div>
+                  )}
+                  {feeText && (
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="inline-flex items-center gap-1.5 text-[#5C4D3C]/70"><Wallet className="h-3.5 w-3.5" /> Fee</dt>
+                      <dd className="text-right font-semibold text-[#342417]">{feeText}</dd>
+                    </div>
+                  )}
+                  {portfolio.referenceId && (
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-[#5C4D3C]/70">Ref</dt>
+                      <dd className="font-mono text-[12px] font-semibold text-[#342417]">{portfolio.referenceId}</dd>
+                    </div>
+                  )}
+                </dl>
+              </Card>
+            )}
+
+            {portfolio && (portfolio.serviceAreas?.length ?? 0) > 0 && (
+              <Card title="Service areas">
+                <div className="flex flex-wrap gap-1.5">
+                  {portfolio.serviceAreas!.map((a) => (
+                    <span key={a} className="rounded-full bg-sand/60 px-2.5 py-1 text-[12px] font-semibold text-[#5C4D3C]">{a}</span>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {portfolio && (portfolio.languages?.length ?? 0) > 0 && (
+              <Card title="Languages">
+                <div className="flex flex-wrap gap-1.5">
+                  {portfolio.languages!.map((l) => (
+                    <span key={l} className="inline-flex items-center gap-1 rounded-full bg-sand/60 px-2.5 py-1 text-[12px] font-semibold text-[#5C4D3C]">
+                      <LangIcon className="h-3 w-3 text-[#157A74]" /> {l}
+                    </span>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {socials.length > 0 && (
+              <Card title="Links">
+                <div className="flex flex-col gap-2">
+                  {socials.map(({ key, value }) => {
+                    const meta = SOCIAL_META[key];
+                    const SIcon = meta.icon;
+                    return (
+                      <a key={key} href={socialHref(key, value)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-[13px] font-semibold text-[#5C4D3C] transition hover:text-[#B05B33]">
+                        <SIcon className="h-4 w-4 text-[#5C4D3C]/60" /> {meta.label}
+                      </a>
+                    );
+                  })}
+                </div>
+              </Card>
+            )}
+
+            {portfolio && (
+              <button onClick={() => setConfirmDelete(true)} className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-[13px] font-bold text-red-500 transition hover:bg-red-50">
+                <Trash2 className="h-4 w-4" /> Delete portfolio
+              </button>
+            )}
+          </aside>
+        </div>
+      )}
+
+      {/* Delete confirm modal */}
+      {confirmDelete && portfolio && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" onClick={() => !deleting && setConfirmDelete(false)}>
+          <div className="w-full max-w-sm rounded-2xl border border-mist bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-extrabold text-[#342417]">Delete your portfolio?</h3>
+            <p className="mt-1.5 text-sm text-[#5C4D3C]/75">This removes your public profile and its photos. This can’t be undone.</p>
+            <div className="mt-5 flex justify-end gap-2.5">
+              <button onClick={() => setConfirmDelete(false)} disabled={deleting} className="rounded-xl border border-mist bg-white px-4 py-2 text-[13px] font-bold text-[#5C4D3C] transition hover:border-[#C9B79F] disabled:opacity-50">Cancel</button>
+              <button onClick={handleDeletePortfolio} disabled={deleting} className="inline-flex items-center gap-1.5 rounded-xl bg-red-500 px-4 py-2 text-[13px] font-bold text-white transition hover:bg-red-600 disabled:opacity-70">
+                {deleting ? <><Loader2 className="h-4 w-4 animate-spin" /> Deleting…</> : "Delete"}
+              </button>
             </div>
           </div>
-        </aside>
-      </div>
-    </div>
-  );
-}
-
-/* ───────── helpers ───────── */
-
-function Stat({ icon: Icon, label, value, sub }: { icon: typeof Home; label: string; value: string; sub?: string }) {
-  return (
-    <div className="rounded-2xl border border-[#E8DECF] bg-[#FBF7EF] px-4 py-3.5">
-      <span className="mb-1.5 flex h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: `${ACCENT}14`, color: ACCENT }}>
-        <Icon className="h-4 w-4" />
-      </span>
-      <p className="text-lg font-extrabold leading-none text-[#342417]">
-        {value} {sub && <span className="text-[11px] font-semibold text-[#5C4D3C]/55">{sub}</span>}
-      </p>
-      <p className="mt-1 text-[11px] font-bold text-[#5C4D3C]/60">{label}</p>
-    </div>
-  );
-}
-
-function Card({
-  title,
-  icon: Icon,
-  accent = "#342417",
-  children,
-}: {
-  title: string;
-  icon?: typeof Home;
-  accent?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-[#E8DECF] bg-white p-5 sm:p-6 shadow-sm">
-      <h2 className="mb-4 flex items-center gap-2 text-base font-extrabold text-[#342417]">
-        {Icon && <Icon className="h-4.5 w-4.5" style={{ color: accent }} />}
-        {title}
-      </h2>
-      {children}
-    </section>
-  );
-}
-
-function FormRow({
-  label,
-  value,
-  editing,
-  icon: Icon,
-  children,
-}: {
-  label: string;
-  value: string;
-  editing: boolean;
-  icon?: typeof Home;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <p className="mb-1.5 text-xs font-bold text-[#5C4D3C]/80">{label}</p>
-      {editing ? (
-        children
-      ) : (
-        <p className="flex items-center gap-2 text-sm font-semibold text-[#342417]">
-          {Icon && <Icon className="h-4 w-4 shrink-0 text-[#5C4D3C]/45" />}
-          {value || "—"}
-        </p>
+        </div>
       )}
-    </div>
-  );
-}
-
-function ChipList({ items }: { items: string[] }) {
-  if (items.length === 0) return <p className="text-sm text-[#5C4D3C]/55">—</p>;
-  return (
-    <div className="flex flex-wrap gap-2">
-      {items.map((i) => (
-        <span key={i} className="rounded-full border border-[#E0D4C5] bg-[#FAF7F2] px-3 py-1.5 text-xs font-bold text-[#342417]">
-          {i}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function ChipSelect({ options, selected, onToggle }: { options: string[]; selected: string[]; onToggle: (v: string) => void }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {options.map((o) => {
-        const on = selected.includes(o);
-        return (
-          <button key={o} type="button" onClick={() => onToggle(o)} style={on ? { borderColor: ACCENT, backgroundColor: `${ACCENT}12`, color: "#342417" } : undefined} className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-bold transition cursor-pointer ${on ? "" : "border-[#E0D4C5] bg-white text-[#5C4D3C]/70 hover:text-[#342417]"}`}>
-            {on && <Check className="h-3 w-3" style={{ color: ACCENT }} />}
-            {o}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function VerifyRow({ label, done, actionLabel }: { label: string; done: boolean; actionLabel?: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="flex items-center gap-2 text-sm font-semibold text-[#342417]">
-        <BadgeCheck className={`h-4 w-4 ${done ? "text-emerald-600" : "text-[#5C4D3C]/30"}`} />
-        {label}
-      </span>
-      {done ? (
-        <span className="text-[11px] font-extrabold text-emerald-600">Verified</span>
-      ) : (
-        <button type="button" onClick={() => toast.success("Verification started.")} className="text-[11px] font-extrabold cursor-pointer" style={{ color: ACCENT }}>
-          {actionLabel ?? "Verify"}
-        </button>
-      )}
-    </div>
-  );
-}
-
-function SocialLink({ icon: Icon, label }: { icon: typeof Home; label: string }) {
-  return (
-    <p className="flex items-center gap-2.5 text-sm font-semibold text-[#342417]">
-      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#FAF7F2] text-[#5C4D3C]/70">
-        <Icon className="h-4 w-4" />
-      </span>
-      <span className="truncate">{label}</span>
-    </p>
-  );
-}
-
-function SocialInput({ icon: Icon, value, onChange, placeholder }: { icon: typeof Home; value: string; onChange: (v: string) => void; placeholder: string }) {
-  return (
-    <div className="relative">
-      <Icon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#5C4D3C]/40" />
-      <input className={`${inputCls} pl-9`} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
     </div>
   );
 }

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Loader2, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import {
-  INITIAL_PORTFOLIO_FORM, fetchPortfolioById, mapApiToForm, savePortfolio,
+  INITIAL_PORTFOLIO_FORM, fetchPortfolioById, fetchMyPortfolio, mapApiToForm, savePortfolio,
   type PortfolioFormData,
 } from "@/lib/portfolio-api";
 import { CATEGORY_LABELS, PORTFOLIO_SCHEMAS, isFieldVisible } from "@/lib/portfolio-schemas";
@@ -27,7 +27,11 @@ interface Props {
 export function PortfolioCreateWizard({ editId }: Props) {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
-  const isEdit = !!editId;
+
+  // The portfolio being edited — either the one passed in, or the user's existing
+  // one auto-detected in create mode (one portfolio per user).
+  const [resolvedId, setResolvedId] = useState<string | undefined>(editId);
+  const isEdit = !!resolvedId;
 
   const [form, setForm] = useState<PortfolioFormData>(INITIAL_PORTFOLIO_FORM);
   const [step, setStep] = useState(0);
@@ -52,22 +56,31 @@ export function PortfolioCreateWizard({ editId }: Props) {
     };
 
     const run = async () => {
-      if (isEdit) {
-        const api = await fetchPortfolioById(editId!);
+      if (editId) {
+        const api = await fetchPortfolioById(editId);
         if (active && api) setForm(mapApiToForm(api, identityFromUser));
       } else {
-        let restored: Partial<PortfolioFormData> = {};
-        try {
-          const raw = localStorage.getItem(DRAFT_KEY);
-          if (raw) restored = JSON.parse(raw);
-        } catch { /* ignore malformed draft */ }
-        if (active) setForm({ ...INITIAL_PORTFOLIO_FORM, ...identityFromUser, ...restored });
+        // Create mode: if the user already has a portfolio, open it for editing
+        // (one portfolio per user) instead of letting them create a duplicate.
+        const existing = await fetchMyPortfolio().catch(() => null);
+        if (active && existing) {
+          setForm(mapApiToForm(existing, identityFromUser));
+          setResolvedId(existing._id);
+          toast.info("You already have a portfolio — editing it.");
+        } else if (active) {
+          let restored: Partial<PortfolioFormData> = {};
+          try {
+            const raw = localStorage.getItem(DRAFT_KEY);
+            if (raw) restored = JSON.parse(raw);
+          } catch { /* ignore malformed draft */ }
+          setForm({ ...INITIAL_PORTFOLIO_FORM, ...identityFromUser, ...restored });
+        }
       }
       if (active) setHydrating(false);
     };
     run();
     return () => { active = false; };
-  }, [authLoading, isEdit, editId, user]);
+  }, [authLoading, editId, user]);
 
   const stepMeta = useMemo(() => {
     const cat = form.category ? CATEGORY_LABELS[form.category] : "Professional";
@@ -181,7 +194,7 @@ export function PortfolioCreateWizard({ editId }: Props) {
     }
     setSubmitting(true);
     try {
-      await savePortfolio(buildFormData(), editId);
+      await savePortfolio(buildFormData(), resolvedId);
       if (!isEdit) localStorage.removeItem(DRAFT_KEY);
       setSuccess(true);
       toast.success(isEdit ? "Portfolio updated." : "Portfolio published.");

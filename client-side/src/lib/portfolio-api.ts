@@ -191,6 +191,14 @@ export async function savePortfolio(fd: FormData, editId?: string): Promise<ApiP
   return json.data;
 }
 
+export async function deletePortfolio(id: string): Promise<void> {
+  const res = await apiFetch(`${API_BASE}/portfolios/${id}`, { method: "DELETE" });
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.message || "Failed to delete portfolio");
+  }
+}
+
 // ── Public directory / profile (no auth — safe in server components) ──────────
 
 export interface PublicOwner {
