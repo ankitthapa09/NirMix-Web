@@ -118,6 +118,29 @@ export async function fetchPropertyById(id: string): Promise<Property | null> {
   }
 }
 
+/** Save (bookmark) a property for the current user. */
+export async function saveProperty(id: string): Promise<void> {
+  const { apiFetch } = await import("./api-client");
+  const res = await apiFetch(`${API_BASE}/users/me/saved/${id}`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to save property");
+}
+
+/** Remove a property from the current user's saved list. */
+export async function unsaveProperty(id: string): Promise<void> {
+  const { apiFetch } = await import("./api-client");
+  const res = await apiFetch(`${API_BASE}/users/me/saved/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to remove saved property");
+}
+
+/** Fetch the current user's saved properties, mapped to the UI `Property` type. */
+export async function fetchSavedProperties(): Promise<Property[]> {
+  const { apiFetch } = await import("./api-client");
+  const res = await apiFetch(`${API_BASE}/users/me/saved`);
+  if (!res.ok) throw new Error("Failed to fetch saved properties");
+  const json = await res.json();
+  return ((json.data as ApiProperty[]) ?? []).map(mapApiToProperty);
+}
+
 /** Fetch the raw (unmapped) listing — needed to prefill the edit wizard with its full `details`. */
 export async function fetchApiProperty(id: string): Promise<ApiProperty | null> {
   try {

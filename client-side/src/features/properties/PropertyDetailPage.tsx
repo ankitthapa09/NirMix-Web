@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useSaved } from "@/lib/saved-context";
 import {
   MapPin,
   BedDouble,
@@ -171,7 +172,8 @@ export function PropertyDetailPage({ property, backTo }: PropertyDetailPageProps
   const highlights = property.highlights ?? [];
 
   const [activePhoto, setActivePhoto] = useState(0);
-  const [saved, setSaved] = useState(false);
+  const { isSaved, toggleSave } = useSaved();
+  const saved = isSaved(property.id);
 
   // Schedule-visit form
   const [visit, setVisit] = useState({ date: "", slot: "", name: "", phone: "" });
@@ -302,11 +304,12 @@ export function PropertyDetailPage({ property, backTo }: PropertyDetailPageProps
             <div className="absolute right-4 top-4 flex gap-2">
               <button
                 type="button"
-                onClick={() => setSaved((s) => !s)}
+                onClick={() => toggleSave(property)}
                 className="flex h-10 w-10 items-center justify-center rounded-full bg-white/85 text-[#342417] shadow-sm backdrop-blur-sm transition hover:bg-white cursor-pointer"
-                aria-label="Save property"
+                aria-label={saved ? "Remove from saved" : "Save property"}
+                aria-pressed={saved}
               >
-                <Heart className={`h-4.5 w-4.5 ${saved ? "fill-red-500 text-red-500" : ""}`} />
+                <Heart className={`h-4.5 w-4.5 transition-transform ${saved ? "scale-110 fill-red-500 text-red-500" : ""}`} />
               </button>
               <button
                 type="button"

@@ -1,6 +1,11 @@
 import { UploadApiResponse } from 'cloudinary';
 import { cloudinary } from '../config/cloudinary.js';
-import { updateUser, findUserById, findUserById_WithPassword } from '../repositories/user.repository.js';
+import {
+  updateUser, findUserById, findUserById_WithPassword,
+  addSavedProperty, removeSavedProperty, findSavedProperties,
+} from '../repositories/user.repository.js';
+import { findPropertyById } from '../repositories/property.repository.js';
+import { IProperty } from '../models/propertyModel.js';
 import { ApiError } from '../utils/ApiError.js';
 import { HTTP_STATUS } from '../constants/httpStatus.js';
 
@@ -107,6 +112,37 @@ class UserService {
     // Assigning triggers the schema's pre-save hook, which hashes the password.
     user.password = newPassword;
     await user.save();
+  }
+
+  /**
+   * Save (bookmark) a property for the authenticated user. Idempotent.
+   */
+  async saveProperty(userId: string, propertyId: string): Promise<void> {
+    const property = await findPropertyById(propertyId);
+    if (!property) {
+      throw new ApiError(HTTP_STATUS.NOT_FOUND, 'Property not found');
+    }
+    await addSavedProperty(userId, propertyId);
+  }
+
+  /**
+   * Remove a property from the user's saved list. Idempotent.
+   */
+  async unsaveProperty(userId: string, propertyId: string): Promise<void> {
+    await removeSavedProperty(userId, propertyId);
+  }
+
+  /**
+   * The user's saved properties (populated). Skips any that were since deleted.
+   */
+  async getSavedProperties(userId: string): Promise<IProperty[]> {
+    const user = await findSavedProperties(userId);
+    if (!user) {
+      throw new ApiError(HTTP_STATUS.NOT_FOUND, 'User not found');
+    }
+    return (user.savedProperties as unknown as (IProperty | null)[]).filter(
+      (p): p is IProperty => p !== null
+    );
   }
 }
 

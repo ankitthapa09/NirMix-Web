@@ -1,4 +1,4 @@
-import mongoose, { Document, Schema} from "mongoose";
+import mongoose, { Document, Schema, Types } from "mongoose";
 import bcrypt from 'bcryptjs';
 import { ALL_Portfolio_ROLES, PortfolioRole } from "../constants/portfolioRoles";
 
@@ -25,6 +25,7 @@ export interface IUser extends Document{
     hasPostedProperty: boolean;
     isProfessional: boolean;
     profession: PortfolioRole[];
+    savedProperties: Types.ObjectId[];
 
     isAdmim: boolean;
     isEmailVerified: boolean;
@@ -132,6 +133,11 @@ const userSchema = new Schema <IUser>(
         profession: {
             type: [String],
             enum: ALL_Portfolio_ROLES,    // Only valid role strings allowed
+            default: []
+        },
+
+        savedProperties: {
+            type: [{ type: Schema.Types.ObjectId, ref: 'Property' }],
             default: []
         },
 

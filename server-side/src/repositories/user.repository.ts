@@ -34,3 +34,21 @@ export async function findUserByEmail_WithPassword(email: string): Promise<IUser
 export async function findUserById_WithPassword(id: string): Promise<IUser | null> {
   return User.findById(id).select('+password');
 }
+
+// ── Saved properties ──
+
+export async function addSavedProperty(userId: string, propertyId: string): Promise<void> {
+  await User.findByIdAndUpdate(userId, { $addToSet: { savedProperties: propertyId } });
+}
+
+export async function removeSavedProperty(userId: string, propertyId: string): Promise<void> {
+  await User.findByIdAndUpdate(userId, { $pull: { savedProperties: propertyId } });
+}
+
+/** The user's saved properties, populated and newest-saved first. */
+export async function findSavedProperties(userId: string): Promise<IUser | null> {
+  return User.findById(userId).populate({
+    path: 'savedProperties',
+    options: { sort: { createdAt: -1 } },
+  });
+}
