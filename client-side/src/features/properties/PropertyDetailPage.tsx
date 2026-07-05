@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useSaved } from "@/lib/saved-context";
+import { useAuth } from "@/lib/auth-context";
+import { scheduleVisit } from "@/lib/visit-api";
+import { OwnerVisitRequests } from "./components/OwnerVisitRequests";
 import {
   MapPin,
   BedDouble,
@@ -174,19 +177,36 @@ export function PropertyDetailPage({ property, backTo }: PropertyDetailPageProps
   const [activePhoto, setActivePhoto] = useState(0);
   const { isSaved, toggleSave } = useSaved();
   const saved = isSaved(property.id);
+  const { user } = useAuth();
+  const isOwner = !!user && !!property.ownerId && user.id === property.ownerId;
 
   // Schedule-visit form
   const [visit, setVisit] = useState({ date: "", slot: "", name: "", phone: "" });
   const [visitBooked, setVisitBooked] = useState(false);
+  const [submittingVisit, setSubmittingVisit] = useState(false);
 
-  const submitVisit = (e: React.FormEvent) => {
+  const submitVisit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!visit.date || !visit.slot || !visit.name.trim() || !visit.phone.trim()) {
       toast.error("Please fill in date, time, name and phone.");
       return;
     }
-    setVisitBooked(true);
-    toast.success("Visit requested! The lister will confirm shortly.");
+    setSubmittingVisit(true);
+    try {
+      await scheduleVisit({
+        propertyId: property.id,
+        date: visit.date,
+        slot: visit.slot,
+        name: visit.name.trim(),
+        phone: visit.phone.trim(),
+      });
+      setVisitBooked(true);
+      toast.success("Visit requested! The lister will confirm shortly.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn’t request the visit. Please try again.");
+    } finally {
+      setSubmittingVisit(false);
+    }
   };
 
   // Reviews
@@ -723,12 +743,18 @@ export function PropertyDetailPage({ property, backTo }: PropertyDetailPageProps
                   <CalendarDays className="h-4 w-4" />
                 </span>
                 <div>
-                  <p className="text-sm font-extrabold leading-none text-[#342417]">Schedule a visit</p>
-                  <p className="mt-1 text-[11px] text-[#5C4D3C]/60">Pick a date & time that suits you</p>
+                  <p className="text-sm font-extrabold leading-none text-[#342417]">
+                    {isOwner ? "Visit requests" : "Schedule a visit"}
+                  </p>
+                  <p className="mt-1 text-[11px] text-[#5C4D3C]/60">
+                    {isOwner ? "Confirm or decline requests for this property" : "Pick a date & time that suits you"}
+                  </p>
                 </div>
               </div>
 
-              {visitBooked ? (
+              {isOwner ? (
+                <OwnerVisitRequests propertyId={property.id} />
+              ) : visitBooked ? (
                 <div className="flex flex-col items-center px-5 py-8 text-center">
                   <CheckCircle2 className="mb-3 h-12 w-12 text-emerald-500" />
                   <p className="text-sm font-extrabold text-[#342417]">Visit requested</p>
@@ -803,11 +829,12 @@ export function PropertyDetailPage({ property, backTo }: PropertyDetailPageProps
 
                   <button
                     type="submit"
+                    disabled={submittingVisit}
                     style={{ backgroundColor: accent }}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white shadow-md transition hover:brightness-105 active:scale-[0.99] cursor-pointer"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white shadow-md transition hover:brightness-105 active:scale-[0.99] cursor-pointer disabled:opacity-70"
                   >
                     <CalendarDays className="h-4 w-4" />
-                    Request visit
+                    {submittingVisit ? "Requesting…" : "Request visit"}
                   </button>
                   <p className="text-center text-[10px] text-[#5C4D3C]/50">
                     No charges — the lister confirms before the visit.

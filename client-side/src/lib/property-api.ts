@@ -70,6 +70,7 @@ export function mapApiToProperty(api: ApiProperty): Property {
 
   return {
     id: api._id,
+    ownerId: owner?._id,
     title: api.title,
     type: api.propertyType as PropertyType,
     price: api.price,
