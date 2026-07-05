@@ -177,7 +177,7 @@ export function PropertyDetailPage({ property, backTo }: PropertyDetailPageProps
   const [activePhoto, setActivePhoto] = useState(0);
   const { isSaved, toggleSave } = useSaved();
   const saved = isSaved(property.id);
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const isOwner = !!user && !!property.ownerId && user.id === property.ownerId;
 
   // Schedule-visit form
@@ -187,6 +187,7 @@ export function PropertyDetailPage({ property, backTo }: PropertyDetailPageProps
 
   const submitVisit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isOwner) return; // owners manage requests, they don't book their own visits
     if (!visit.date || !visit.slot || !visit.name.trim() || !visit.phone.trim()) {
       toast.error("Please fill in date, time, name and phone.");
       return;
@@ -752,7 +753,11 @@ export function PropertyDetailPage({ property, backTo }: PropertyDetailPageProps
                 </div>
               </div>
 
-              {isOwner ? (
+              {authLoading ? (
+                <div className="px-5 py-8">
+                  <div className="h-24 animate-pulse rounded-xl bg-[#EFE7D8]" />
+                </div>
+              ) : isOwner ? (
                 <OwnerVisitRequests propertyId={property.id} />
               ) : visitBooked ? (
                 <div className="flex flex-col items-center px-5 py-8 text-center">

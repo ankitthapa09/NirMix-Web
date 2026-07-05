@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import visitController from '../controllers/visit.controller.js';
-import { verifyAccessToken, isAuthenticated } from '../middlewares/auth.middleware.js';
+import { verifyAccessToken, isAuthenticated, optionalAuth } from '../middlewares/auth.middleware.js';
 import { asyncHandler } from '../middlewares/error.middleware.js';
 
 const router = Router();
@@ -22,7 +22,7 @@ router.get(
  * Schedule a visit for a property (public)
  * Body: { propertyId, date, slot, name, phone, email?, message? }
  */
-router.post('/', asyncHandler(visitController.create.bind(visitController)));
+router.post('/', optionalAuth, asyncHandler(visitController.create.bind(visitController)));
 
 /**
  * PATCH /api/visits/:id/status

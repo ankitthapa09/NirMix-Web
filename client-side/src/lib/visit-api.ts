@@ -36,9 +36,12 @@ export interface ApiVisit {
   createdAt: string;
 }
 
-/** Request a visit for a property (public — no auth needed). */
+/**
+ * Request a visit for a property. Works for guests; if the user is logged in the
+ * token is attached so the server can reject an owner booking their own listing.
+ */
 export async function scheduleVisit(input: ScheduleVisitInput): Promise<void> {
-  const res = await fetch(`${API_BASE}/visits`, {
+  const res = await apiFetch(`${API_BASE}/visits`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),

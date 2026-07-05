@@ -22,6 +22,11 @@ class VisitService {
       throw new ApiError(HTTP_STATUS.NOT_FOUND, 'Property not found');
     }
 
+    // An owner can't request a visit on their own listing.
+    if (visitorId && property.owner.toString() === visitorId) {
+      throw new ApiError(HTTP_STATUS.FORBIDDEN, 'You can’t request a visit on your own property');
+    }
+
     return createVisit({
       property: new Types.ObjectId(data.propertyId),
       propertyOwner: property.owner,
