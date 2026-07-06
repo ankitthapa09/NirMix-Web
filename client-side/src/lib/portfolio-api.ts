@@ -1,6 +1,6 @@
 import { API_BASE } from "./property-api";
 import { apiFetch } from "./api-client";
-import type { PortfolioCategory } from "./portfolio-schemas";
+import { CATEGORY_LABELS, type PortfolioCategory } from "./portfolio-schemas";
 
 // ── Shared media / project shapes ───────────────────────────────────────────
 
@@ -89,9 +89,21 @@ export const INITIAL_PORTFOLIO_FORM: PortfolioFormData = {
 
 // ── Raw API shape ────────────────────────────────────────────────────────────
 
+export interface ApiOwner {
+  _id: string;
+  name: string;
+  displayName?: string;
+  email?: string;
+  contact?: string;
+  avatar?: string;
+  address?: { province?: string; district?: string; municipality?: string; ward?: string; tole?: string };
+  isVerified?: boolean;
+  isEmailVerified?: boolean;
+}
+
 export interface ApiPortfolio {
   _id: string;
-  owner: string | { _id: string; name: string; email: string; avatar?: string };
+  owner: string | ApiOwner;
   category: PortfolioCategory;
   referenceId?: string;
   status: "draft" | "active" | "hidden";
@@ -177,4 +189,104 @@ export async function savePortfolio(fd: FormData, editId?: string): Promise<ApiP
   const json = await res.json();
   if (!res.ok) throw new Error(json.message || "Failed to save portfolio");
   return json.data;
+}
+
+export async function deletePortfolio(id: string): Promise<void> {
+  const res = await apiFetch(`${API_BASE}/portfolios/${id}`, { method: "DELETE" });
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.message || "Failed to delete portfolio");
+  }
+}
+
+// ── Public directory / profile (no auth — safe in server components) ──────────
+
+export interface PublicOwner {
+  name: string; // display name if set, else the account name
+  legalName: string;
+  avatar?: string;
+  email?: string;
+  contact?: string;
+  location: string;
+  verified: boolean;
+}
+
+export interface PublicPortfolio {
+  id: string;
+  referenceId?: string;
+  category: PortfolioCategory;
+  categoryLabel: string;
+  headline: string;
+  availability: string;
+  bio: string;
+  experienceYears?: number;
+  serviceAreas: string[];
+  languages: string[];
+  preferredContact: string;
+  feeModel: string;
+  feeAmount?: number;
+  details: Record<string, unknown>;
+  socials: PortfolioSocials;
+  projects: PortfolioProject[];
+  coverImage?: PortfolioMedia;
+  owner: PublicOwner;
+  createdAt: string;
+}
+
+/** Map a raw API portfolio (owner populated) onto the public-facing UI shape. */
+export function mapApiToPublic(api: ApiPortfolio): PublicPortfolio {
+  const owner = typeof api.owner === "object" ? api.owner : undefined;
+  const addr = owner?.address;
+  const location = [addr?.tole, addr?.municipality, addr?.district].filter(Boolean).join(", ");
+
+  return {
+    id: api._id,
+    referenceId: api.referenceId,
+    category: api.category,
+    categoryLabel: CATEGORY_LABELS[api.category] ?? "Professional",
+    headline: api.headline ?? "",
+    availability: api.availability ?? "",
+    bio: api.bio ?? "",
+    experienceYears: api.experienceYears,
+    serviceAreas: api.serviceAreas ?? [],
+    languages: api.languages ?? [],
+    preferredContact: api.preferredContact ?? "",
+    feeModel: api.feeModel ?? "",
+    feeAmount: api.feeAmount,
+    details: api.details ?? {},
+    socials: { ...EMPTY_SOCIALS, ...(api.socials ?? {}) },
+    projects: (api.projects ?? []).map((p) => ({ ...p, localId: nextLocalId() })),
+    coverImage: api.coverImage,
+    owner: {
+      name: owner?.displayName || owner?.name || "NirMix Professional",
+      legalName: owner?.name ?? "",
+      avatar: owner?.avatar,
+      email: owner?.email,
+      contact: owner?.contact,
+      location,
+      verified: !!owner?.isVerified,
+    },
+    createdAt: api.createdAt,
+  };
+}
+
+/** Fetch active portfolios for the public directory, optionally filtered by category. */
+export async function fetchPublicPortfolios(category?: PortfolioCategory): Promise<PublicPortfolio[]> {
+  const url = category ? `${API_BASE}/portfolios?category=${category}` : `${API_BASE}/portfolios`;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to fetch portfolios");
+  const json = await res.json();
+  return ((json.data as ApiPortfolio[]) ?? []).map(mapApiToPublic);
+}
+
+/** Fetch a single public portfolio by id (null if not found). */
+export async function fetchPublicPortfolioById(id: string): Promise<PublicPortfolio | null> {
+  try {
+    const res = await fetch(`${API_BASE}/portfolios/${id}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.data ? mapApiToPublic(json.data as ApiPortfolio) : null;
+  } catch {
+    return null;
+  }
 }

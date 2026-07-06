@@ -45,4 +45,37 @@ router.patch(
   asyncHandler(userController.changePassword.bind(userController))
 );
 
+/**
+ * GET /api/users/me/saved
+ * List the authenticated user's saved properties
+ */
+router.get(
+  '/me/saved',
+  verifyAccessToken,
+  isAuthenticated,
+  asyncHandler(userController.getSaved.bind(userController))
+);
+
+/**
+ * POST /api/users/me/saved/:propertyId
+ * Save (bookmark) a property
+ */
+router.post(
+  '/me/saved/:propertyId',
+  verifyAccessToken,
+  isAuthenticated,
+  asyncHandler(userController.saveProperty.bind(userController))
+);
+
+/**
+ * DELETE /api/users/me/saved/:propertyId
+ * Remove a property from the saved list
+ */
+router.delete(
+  '/me/saved/:propertyId',
+  verifyAccessToken,
+  isAuthenticated,
+  asyncHandler(userController.unsaveProperty.bind(userController))
+);
+
 export default router;

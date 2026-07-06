@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 
 import { AuthProvider } from "@/lib/auth-context";
+import { SavedProvider } from "@/lib/saved-context";
 import { Toaster } from "sonner";
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -22,8 +23,10 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={client}>
       <AuthProvider>
-        {children}
-        <Toaster 
+        <SavedProvider>
+          {children}
+        </SavedProvider>
+        <Toaster
           position="top-right" 
           richColors 
           closeButton

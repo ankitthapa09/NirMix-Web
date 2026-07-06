@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Heart, MapPin, BedDouble, Bath, Maximize2, ArrowRight } from "lucide-react";
 import type { Property } from "@/types/property";
+import { useSaved } from "@/lib/saved-context";
 
 interface DashboardPropertyCardProps {
   property: Property;
@@ -23,6 +24,9 @@ function formatPrice(price: number, status: string): string {
 }
 
 export function DashboardPropertyCard({ property }: DashboardPropertyCardProps) {
+  const { isSaved, toggleSave } = useSaved();
+  const saved = isSaved(property.id);
+
   const statusLabel = property.status === "For Sale" ? "BUY" : "RENT";
   const statusColor =
     property.status === "For Sale"
@@ -71,10 +75,14 @@ export function DashboardPropertyCard({ property }: DashboardPropertyCardProps) 
         {/* Heart - top right */}
         <button
           type="button"
-          className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/80 text-[#342417]/60 shadow-sm backdrop-blur-sm transition hover:bg-white hover:text-red-500 cursor-pointer"
-          aria-label="Save property"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSave(property); }}
+          className={`absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full shadow-sm backdrop-blur-sm transition cursor-pointer ${
+            saved ? "bg-white text-red-500" : "bg-white/80 text-[#342417]/60 hover:bg-white hover:text-red-500"
+          }`}
+          aria-label={saved ? "Remove from saved" : "Save property"}
+          aria-pressed={saved}
         >
-          <Heart className="h-4 w-4" />
+          <Heart className={`h-4 w-4 transition-transform ${saved ? "scale-110 fill-red-500" : ""}`} />
         </button>
       </div>
 

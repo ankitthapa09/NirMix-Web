@@ -36,6 +36,8 @@ export type Property = {
     company: string;
   };
   // ── Detailed listing info (shown on the property detail page) ──
+  /** Owner's user id — used to show owner-only controls (e.g. visit requests). */
+  ownerId?: string;
   /** Who posted it — personal owner, agent, or builder. */
   listedBy?: Lister;
   postedOn?: string;

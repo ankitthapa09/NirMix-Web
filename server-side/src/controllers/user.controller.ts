@@ -88,6 +88,63 @@ class UserController {
       next(error);
     }
   }
+
+  /**
+   * GET /api/users/me/saved
+   * List the authenticated user's saved properties.
+   */
+  async getSaved(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user?.id;
+      if (!userId) throw new ApiError(HTTP_STATUS.UNAUTHORIZED, 'User not authenticated');
+
+      const properties = await userService.getSavedProperties(userId);
+
+      res.status(HTTP_STATUS.OK).json(
+        new ApiResponse(HTTP_STATUS.OK, properties, 'Saved properties fetched successfully')
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/users/me/saved/:propertyId
+   * Save (bookmark) a property.
+   */
+  async saveProperty(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user?.id;
+      if (!userId) throw new ApiError(HTTP_STATUS.UNAUTHORIZED, 'User not authenticated');
+
+      await userService.saveProperty(userId, String(req.params.propertyId));
+
+      res.status(HTTP_STATUS.OK).json(
+        new ApiResponse(HTTP_STATUS.OK, null, 'Property saved')
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * DELETE /api/users/me/saved/:propertyId
+   * Remove a property from the saved list.
+   */
+  async unsaveProperty(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user?.id;
+      if (!userId) throw new ApiError(HTTP_STATUS.UNAUTHORIZED, 'User not authenticated');
+
+      await userService.unsaveProperty(userId, String(req.params.propertyId));
+
+      res.status(HTTP_STATUS.OK).json(
+        new ApiResponse(HTTP_STATUS.OK, null, 'Property removed from saved')
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default new UserController();

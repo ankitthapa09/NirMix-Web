@@ -6,8 +6,7 @@ export const siteConfig = {
     { label: "Buy", href: "/buy" },
     { label: "Rent", href: "/rent" },
     { label: "All Property", href: "/properties", highlight: true },
-    { label: "Agents", href: "/agents" },
-    { label: "Dealers", href: "/dealers" },
+    { label: "Professionals", href: "/professionals" },
   ],
   cta: {
     label: "Sign Up",

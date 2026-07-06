@@ -67,7 +67,7 @@ export function StepReach({ form, update }: StepProps) {
             className={`${inputCls} pl-9`}
           />
         </div>
-        <div className="flex max-h-44 flex-wrap gap-2 overflow-y-auto rounded-xl border border-[#EAE3D8] bg-[#FAF7F2] p-3">
+        <div className="flex max-h-44 flex-wrap gap-2 overflow-y-auto rounded-xl border border-[#EAE3D8] bg-[#FAF7F2] p-3 [scrollbar-gutter:stable]">
           {matches.map((d) => {
             const on = form.serviceAreas.includes(d);
             return (
