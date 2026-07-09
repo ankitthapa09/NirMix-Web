@@ -1,6 +1,7 @@
 import express, { Express } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import { env } from './src/config/env.js';
 import { connectDB } from './src/config/db.js';
 import authRoutes from './src/routes/auth.routes.js';
 import propertyRoutes from './src/routes/property.routes.js';
@@ -16,9 +17,11 @@ const app: Express = express();
 // MIDDLEWARE
 
 // Security Middlewares
+// CLIENT_URL is a validated allowlist of origins (localhost and 127.0.0.1 are
+// distinct origins to the browser, so both are allowed in dev by default).
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: env.CLIENT_URL,
   credentials: true,
 }));
 
