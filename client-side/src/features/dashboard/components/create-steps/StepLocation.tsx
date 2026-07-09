@@ -1,9 +1,33 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { MapPin, ChevronDown } from "lucide-react";
 import { PropertyFormData, StepProps } from "./types";
+import type { LatLng } from "./LocationPicker";
+
+// Leaflet touches `window`, so the picker must never render during SSR.
+const LocationPicker = dynamic(() => import("./LocationPicker"), {
+  ssr: false,
+  loading: () => (
+    <div className="nm-recessed flex h-64 w-full items-center justify-center text-xs font-semibold text-[#342417]/55">
+      Loading map…
+    </div>
+  ),
+});
 
 type StepLocationProps = StepProps;
+
+// Rough district centers so the map opens near the listing; falls back to Kathmandu.
+const DISTRICT_CENTERS: Record<string, LatLng> = {
+  Kathmandu: { lat: 27.7172, lng: 85.324 },
+  Lalitpur: { lat: 27.6588, lng: 85.3247 },
+  Bhaktapur: { lat: 27.671, lng: 85.4298 },
+  Kaski: { lat: 28.2096, lng: 83.9856 },
+  Morang: { lat: 26.6646, lng: 87.2718 },
+  Sunsari: { lat: 26.6265, lng: 87.1718 },
+  Rupandehi: { lat: 27.6244, lng: 83.4419 },
+};
+const DEFAULT_CENTER: LatLng = { lat: 27.7172, lng: 85.324 };
 
 const PROVINCES = [
   "Koshi Province",
@@ -26,7 +50,8 @@ const DISTRICTS_BY_PROVINCE: Record<string, string[]> = {
 };
 
 export function StepLocation({ formData, onChange, errors }: StepLocationProps) {
-  const { province, district, city, wardNo, area, landmark } = formData;
+  const { province, district, city, wardNo, area, landmark, coordinates } = formData;
+  const mapCenter = (district && DISTRICT_CENTERS[district]) || DEFAULT_CENTER;
 
   const handleUpdate = (fields: Partial<PropertyFormData>) => {
     onChange({ ...formData, ...fields });
@@ -152,32 +177,40 @@ export function StepLocation({ formData, onChange, errors }: StepLocationProps) 
         </div>
       </div>
 
-      {/* Interactive Map Placeholder — carved into the board */}
+      {/* Interactive Map — pin the exact location */}
       <div className="pt-2">
-        <label className="nm-label">Pin Exact Location</label>
-        <div className="nm-recessed relative w-full h-64 flex flex-col items-center justify-center cursor-pointer group overflow-hidden">
-          {/* Mock Map Background graphic */}
-          <div className="absolute inset-0 opacity-15 pointer-events-none rounded-2xl overflow-hidden bg-[radial-gradient(circle_at_center,_#342417_1.5px,_transparent_1.5px)] bg-[size:16px_16px] flex items-center justify-center">
-            {/* mock grid lines */}
-            <div className="w-full h-full border-t border-b border-[#342417]/30 flex flex-col justify-around">
-              <div className="h-[1px] bg-[#342417]/10" />
-              <div className="h-[1px] bg-[#342417]/10" />
-            </div>
-          </div>
-          
-          <div
-            className="z-10 p-4 rounded-full mb-3 group-hover:scale-110 transition-transform duration-300 shadow-sm"
-            style={{ backgroundColor: "var(--nm-accent-soft)", color: "var(--nm-accent)" }}
-          >
-            <MapPin className="h-7 w-7" />
-          </div>
-          <span className="z-10 text-sm font-bold text-[#342417]">
-            Drag & Drop Pin or Click to Select
-          </span>
-          <span className="z-10 text-xs text-[#342417]/55 mt-1">
-            Pinning exact location increases buyer trust by 45%.
-          </span>
+        <div className="mb-2 flex items-center justify-between">
+          <label className="nm-label mb-0">Pin Exact Location</label>
+          {coordinates && (
+            <button
+              type="button"
+              onClick={() => handleUpdate({ coordinates: undefined })}
+              className="text-xs font-semibold text-[#B05B33] hover:underline"
+            >
+              Clear pin
+            </button>
+          )}
         </div>
+
+        <div className="nm-recessed relative w-full overflow-hidden rounded-2xl">
+          <LocationPicker
+            value={coordinates}
+            defaultCenter={mapCenter}
+            onChange={(coords) => handleUpdate({ coordinates: coords })}
+            className="h-64 w-full"
+          />
+        </div>
+
+        <p className="mt-2 text-xs text-[#342417]/55">
+          {coordinates ? (
+            <span className="inline-flex items-center gap-1.5 font-semibold text-[#342417]/70">
+              <MapPin className="h-3.5 w-3.5" style={{ color: "var(--nm-accent)" }} />
+              {coordinates.lat.toFixed(5)}, {coordinates.lng.toFixed(5)}
+            </span>
+          ) : (
+            "Click the map to drop a pin, then drag it to fine-tune. Pinning the exact location increases buyer trust."
+          )}
+        </p>
       </div>
     </div>
   );
