@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useSaved } from "@/lib/saved-context";
@@ -43,6 +44,16 @@ import {
 import { Navbar } from "@/features/landing/components/Navbar";
 import { Footer } from "@/features/landing/components/Footer";
 import type { Property, Lister, PropertyType } from "@/types/property";
+
+// Leaflet touches `window`, so the map must never render during SSR.
+const PropertyMap = dynamic(() => import("@/components/map/PropertyMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-64 w-full items-center justify-center text-xs font-semibold text-[#5C4D3C]/60">
+      Loading map…
+    </div>
+  ),
+});
 
 interface PropertyDetailPageProps {
   property: Property;
@@ -255,7 +266,6 @@ export function PropertyDetailPage({ property, backTo }: PropertyDetailPageProps
   const mapQuery = property.coordinates
     ? `${property.coordinates.lat},${property.coordinates.lng}`
     : `${fullAddress}, Nepal`;
-  const mapEmbedSrc = `https://maps.google.com/maps?q=${encodeURIComponent(mapQuery)}&z=15&output=embed`;
   const mapsHref = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`;
   const isPdfPlan = !!property.floorPlan && /\.pdf($|\?)/i.test(property.floorPlan.url);
 
@@ -543,15 +553,21 @@ export function PropertyDetailPage({ property, backTo }: PropertyDetailPageProps
                 </p>
               )}
 
-              <div className="mt-3 overflow-hidden rounded-2xl border border-mist">
-                <iframe
-                  src={mapEmbedSrc}
-                  title="Property location map"
-                  className="h-64 w-full"
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                />
-              </div>
+              {property.coordinates ? (
+                <div className="mt-3 overflow-hidden rounded-2xl border border-mist">
+                  <PropertyMap
+                    center={property.coordinates}
+                    className="h-64 w-full"
+                    popup={<span className="text-xs font-semibold text-[#342417]">{fullAddress}</span>}
+                  />
+                </div>
+              ) : (
+                <div className="mt-3 flex h-32 flex-col items-center justify-center gap-1.5 rounded-2xl border border-dashed border-mist bg-[#FBF7EF] text-center">
+                  <MapPin className="h-5 w-5 text-[#5C4D3C]/50" />
+                  <p className="text-xs font-semibold text-[#5C4D3C]/70">Exact location not pinned</p>
+                  <p className="text-[11px] text-[#5C4D3C]/50">Use the button below to find the address on Google Maps.</p>
+                </div>
+              )}
 
               <a
                 href={mapsHref}
