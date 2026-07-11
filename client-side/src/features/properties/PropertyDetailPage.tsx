@@ -557,6 +557,7 @@ export function PropertyDetailPage({ property, backTo }: PropertyDetailPageProps
                 <div className="mt-3 overflow-hidden rounded-2xl border border-mist">
                   <PropertyMap
                     center={property.coordinates}
+                    color={accent}
                     className="h-64 w-full"
                     popup={<span className="text-xs font-semibold text-[#342417]">{fullAddress}</span>}
                   />

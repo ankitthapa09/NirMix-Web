@@ -52,6 +52,7 @@ const DISTRICTS_BY_PROVINCE: Record<string, string[]> = {
 export function StepLocation({ formData, onChange, errors }: StepLocationProps) {
   const { province, district, city, wardNo, area, landmark, coordinates } = formData;
   const mapCenter = (district && DISTRICT_CENTERS[district]) || DEFAULT_CENTER;
+  const pinColor = formData.listingType === "For Rent" ? "#157A74" : "#B05B33";
 
   const handleUpdate = (fields: Partial<PropertyFormData>) => {
     onChange({ ...formData, ...fields });
@@ -197,6 +198,7 @@ export function StepLocation({ formData, onChange, errors }: StepLocationProps) 
             value={coordinates}
             defaultCenter={mapCenter}
             onChange={(coords) => handleUpdate({ coordinates: coords })}
+            color={pinColor}
             className="h-64 w-full"
           />
         </div>

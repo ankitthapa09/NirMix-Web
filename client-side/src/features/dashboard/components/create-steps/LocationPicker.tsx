@@ -2,23 +2,14 @@
 
 import { useEffect } from "react";
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
-import L from "leaflet";
+import type L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
+import { pinIcon, PIN_COLORS } from "@/components/map/markerIcons";
 
 export interface LatLng {
   lat: number;
   lng: number;
 }
-
-
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x.src,
-  iconUrl: markerIcon.src,
-  shadowUrl: markerShadow.src,
-});
 
 const round = (n: number) => Math.round(n * 1e6) / 1e6;
 
@@ -50,6 +41,8 @@ interface LocationPickerProps {
   onChange: (coords: LatLng) => void;
   className?: string;
   zoom?: number;
+  /** Pin color — pass the listing accent (ember for sale, jade for rent). */
+  color?: string;
 }
 
 export default function LocationPicker({
@@ -58,6 +51,7 @@ export default function LocationPicker({
   onChange,
   className = "h-64 w-full",
   zoom = 15,
+  color = PIN_COLORS.sale,
 }: LocationPickerProps) {
   const center = value ?? defaultCenter;
 
@@ -77,6 +71,7 @@ export default function LocationPicker({
       {value && (
         <Marker
           position={[value.lat, value.lng]}
+          icon={pinIcon(color)}
           draggable
           eventHandlers={{
             dragend(e) {
