@@ -9,12 +9,17 @@ interface MapFrameProps {
   title?: string;
   /** Renders a fresh <MapContainer>; `expanded` is true for the modal instance. */
   children: (expanded: boolean) => ReactNode;
+  /** Extra buttons in the overlay toolbar; receives a `close` to dismiss the overlay. */
+  renderActions?: (close: () => void) => ReactNode;
 }
 
-
 // Wraps a map with an "Expand" control that opens a fullscreen overlay.
-
-export default function MapFrame({ className = "h-64 w-full", title = "Map", children }: MapFrameProps) {
+export default function MapFrame({
+  className = "h-64 w-full",
+  title = "Map",
+  children,
+  renderActions,
+}: MapFrameProps) {
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
@@ -54,17 +59,20 @@ export default function MapFrame({ className = "h-64 w-full", title = "Map", chi
           aria-modal="true"
           aria-label={title}
         >
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex items-center justify-between gap-2">
             <span className="text-sm font-bold text-white">{title}</span>
-            <button
-              type="button"
-              onClick={() => setExpanded(false)}
-              aria-label="Close map"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-white/95 px-3 py-1.5 text-xs font-bold text-[#342417] shadow-md transition hover:bg-white cursor-pointer"
-            >
-              <X className="h-4 w-4" />
-              Close
-            </button>
+            <div className="flex items-center gap-2">
+              {renderActions?.(() => setExpanded(false))}
+              <button
+                type="button"
+                onClick={() => setExpanded(false)}
+                aria-label="Close map"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-white/95 px-3 py-1.5 text-xs font-bold text-[#342417] shadow-md transition hover:bg-white cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+                Close
+              </button>
+            </div>
           </div>
           <div className="min-h-0 flex-1 overflow-hidden rounded-2xl">
             {children(true)}

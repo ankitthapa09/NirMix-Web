@@ -1,9 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { MapPin, ChevronDown } from "lucide-react";
+import { useState } from "react";
+import { MapPin, ChevronDown, Loader2 } from "lucide-react";
 import { PropertyFormData, StepProps } from "./types";
 import type { LatLng } from "./LocationPicker";
+import { reverseGeocode } from "@/lib/geocode";
 
 // Leaflet touches `window`, so the picker must never render during SSR.
 const LocationPicker = dynamic(() => import("./LocationPicker"), {
@@ -49,13 +51,73 @@ const DISTRICTS_BY_PROVINCE: Record<string, string[]> = {
   "Sudurpashchim Province": ["Bajura", "Bajhang", "Darchula", "Baitadi", "Dadeldhura", "Kanchanpur", "Doti", "Kailali", "Achham"],
 };
 
+const ALL_DISTRICTS = Object.values(DISTRICTS_BY_PROVINCE).flat();
+
+// e.g. "Bagmati Province" / "Bagmati Pradesh" → "bagmati".
+const norm = (s: string) => s.toLowerCase().replace(/province|pradesh|district/g, "").replace(/[^a-z]/g, "");
+
+/** Map a geocoded state name onto one of the seven province options (best-effort). */
+function matchProvince(state?: string): string {
+  if (!state) return "";
+  const n = norm(state);
+  if (!n) return "";
+  return PROVINCES.find((p) => norm(p) === n || norm(p).includes(n) || n.includes(norm(p))) ?? "";
+}
+
+/** Map a geocoded district name onto a district option (searched across all provinces). */
+function matchDistrict(district?: string): string {
+  if (!district) return "";
+  const n = norm(district);
+  if (!n) return "";
+  return ALL_DISTRICTS.find((d) => norm(d) === n || norm(d).includes(n) || n.includes(norm(d))) ?? "";
+}
+
+/** The province that owns a district (first match). */
+function provinceOfDistrict(district: string): string {
+  return Object.entries(DISTRICTS_BY_PROVINCE).find(([, list]) => list.includes(district))?.[0] ?? "";
+}
+
 export function StepLocation({ formData, onChange, errors }: StepLocationProps) {
   const { province, district, city, wardNo, area, landmark, coordinates } = formData;
   const mapCenter = (district && DISTRICT_CENTERS[district]) || DEFAULT_CENTER;
   const pinColor = formData.listingType === "For Rent" ? "#157A74" : "#B05B33";
+  const [geoLoading, setGeoLoading] = useState(false);
 
   const handleUpdate = (fields: Partial<PropertyFormData>) => {
     onChange({ ...formData, ...fields });
+  };
+
+  // Reverse-geocode the pin and auto-fill the address; province/district are
+  // matched to our fixed option lists, city/area/landmark are free-filled.
+  const applyGeocode = async (coords: LatLng) => {
+    setGeoLoading(true);
+    try {
+      const addr = await reverseGeocode(coords.lat, coords.lng);
+      if (!addr) return;
+
+      // District names are reliable; province is inferred from the district
+      // when the state name doesn't match (OSM sometimes misspells provinces).
+      const matchedDistrict = matchDistrict(addr.district);
+      let matchedProvince = matchProvince(addr.province) || provinceOfDistrict(matchedDistrict);
+      if (matchedDistrict && matchedProvince && !DISTRICTS_BY_PROVINCE[matchedProvince]?.includes(matchedDistrict)) {
+        matchedProvince = provinceOfDistrict(matchedDistrict);
+      }
+
+      const patch: Partial<PropertyFormData> = { coordinates: coords };
+      if (matchedProvince) patch.province = matchedProvince;
+      if (matchedDistrict) patch.district = matchedDistrict;
+      if (addr.city) patch.city = addr.city;
+      if (addr.area) patch.area = addr.area;
+      if (addr.landmark) patch.landmark = addr.landmark;
+      handleUpdate(patch);
+    } finally {
+      setGeoLoading(false);
+    }
+  };
+
+  const handlePin = (coords: LatLng) => {
+    handleUpdate({ coordinates: coords }); // drop the pin instantly
+    void applyGeocode(coords); // then fill the address
   };
 
   const handleProvinceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -197,20 +259,26 @@ export function StepLocation({ formData, onChange, errors }: StepLocationProps) 
           <LocationPicker
             value={coordinates}
             defaultCenter={mapCenter}
-            onChange={(coords) => handleUpdate({ coordinates: coords })}
+            onChange={handlePin}
+            onClear={() => handleUpdate({ coordinates: undefined })}
             color={pinColor}
             className="h-64 w-full"
           />
         </div>
 
         <p className="mt-2 text-xs text-[#342417]/55">
-          {coordinates ? (
+          {geoLoading ? (
+            <span className="inline-flex items-center gap-1.5 font-semibold text-[#342417]/70">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Detecting address from pin…
+            </span>
+          ) : coordinates ? (
             <span className="inline-flex items-center gap-1.5 font-semibold text-[#342417]/70">
               <MapPin className="h-3.5 w-3.5" style={{ color: "var(--nm-accent)" }} />
-              {coordinates.lat.toFixed(5)}, {coordinates.lng.toFixed(5)}
+              {coordinates.lat.toFixed(5)}, {coordinates.lng.toFixed(5)} · address auto-filled from pin
             </span>
           ) : (
-            "Click the map to drop a pin, then drag it to fine-tune. Pinning the exact location increases buyer trust."
+            "Click the map to drop a pin — the address fields fill in automatically. Drag to fine-tune."
           )}
         </p>
       </div>
