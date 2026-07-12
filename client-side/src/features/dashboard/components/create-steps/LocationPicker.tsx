@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect } from "react";
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, ZoomControl, useMapEvents, useMap } from "react-leaflet";
 import type L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Check, Trash2 } from "lucide-react";
 import MapFrame from "@/components/map/MapFrame";
+import MapSearch from "@/components/map/MapSearch";
 import { pinIcon, PIN_COLORS } from "@/components/map/markerIcons";
 
 export interface LatLng {
@@ -88,32 +89,37 @@ export default function LocationPicker({
   return (
     <MapFrame className={className} title="Pin exact location" renderActions={renderActions}>
       {(expanded) => (
-        <MapContainer
-          center={[center.lat, center.lng]}
-          zoom={zoom}
-          scrollWheelZoom={expanded}
-          className="h-full w-full"
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <ClickCapture onPick={onChange} />
-          <Recenter center={defaultCenter} active={!value} />
-          {value && (
-            <Marker
-              position={[value.lat, value.lng]}
-              icon={pinIcon(color)}
-              draggable
-              eventHandlers={{
-                dragend(e) {
-                  const p = (e.target as L.Marker).getLatLng();
-                  onChange({ lat: round(p.lat), lng: round(p.lng) });
-                },
-              }}
+        <div className="relative h-full w-full">
+          <MapContainer
+            center={[center.lat, center.lng]}
+            zoom={zoom}
+            scrollWheelZoom={expanded}
+            zoomControl={false}
+            className="h-full w-full"
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-          )}
-        </MapContainer>
+            <ZoomControl position="bottomright" />
+            <ClickCapture onPick={onChange} />
+            <Recenter center={defaultCenter} active={!value} />
+            {value && (
+              <Marker
+                position={[value.lat, value.lng]}
+                icon={pinIcon(color)}
+                draggable
+                eventHandlers={{
+                  dragend(e) {
+                    const p = (e.target as L.Marker).getLatLng();
+                    onChange({ lat: round(p.lat), lng: round(p.lng) });
+                  },
+                }}
+              />
+            )}
+          </MapContainer>
+          <MapSearch onSelect={onChange} />
+        </div>
       )}
     </MapFrame>
   );

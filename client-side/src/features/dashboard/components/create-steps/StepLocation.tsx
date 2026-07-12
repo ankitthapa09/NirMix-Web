@@ -1,11 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MapPin, ChevronDown, Loader2 } from "lucide-react";
 import { PropertyFormData, StepProps } from "./types";
 import type { LatLng } from "./LocationPicker";
-import { reverseGeocode } from "@/lib/geocode";
+import { reverseGeocode, searchPlaces } from "@/lib/geocode";
 
 // Leaflet touches `window`, so the picker must never render during SSR.
 const LocationPicker = dynamic(() => import("./LocationPicker"), {
@@ -53,6 +53,19 @@ const DISTRICTS_BY_PROVINCE: Record<string, string[]> = {
 
 const ALL_DISTRICTS = Object.values(DISTRICTS_BY_PROVINCE).flat();
 
+// Local units (municipalities / rural municipalities-VDCs) for the major
+// districts. Used as datalist suggestions — the field still accepts free text
+// for districts not covered here.
+const MUNICIPALITIES_BY_DISTRICT: Record<string, string[]> = {
+  Kathmandu: ["Kathmandu Metropolitan City", "Budhanilkantha", "Tokha", "Gokarneshwor", "Kageshwori Manohara", "Chandragiri", "Tarakeshwor", "Nagarjun", "Kirtipur", "Shankharapur", "Dakshinkali"],
+  Lalitpur: ["Lalitpur Metropolitan City", "Godawari", "Mahalaxmi", "Konjyosom", "Bagmati", "Mahankal"],
+  Bhaktapur: ["Bhaktapur", "Madhyapur Thimi", "Changunarayan", "Suryabinayak"],
+  Kaski: ["Pokhara Metropolitan City", "Annapurna", "Machhapuchhre", "Madi", "Rupa"],
+  Morang: ["Biratnagar Metropolitan City", "Sundar Haraincha", "Belbari", "Pathari Shanishchare", "Urlabari", "Rangeli", "Letang", "Sunwarshi", "Ratuwamai"],
+  Sunsari: ["Itahari", "Dharan", "Inaruwa", "Duhabi", "Ramdhuni", "Barah", "Koshi", "Barju", "Bhokraha", "Harinagar", "Dewanganj", "Gadhi"],
+  Rupandehi: ["Butwal", "Siddharthanagar", "Devdaha", "Lumbini Sanskritik", "Sainamaina", "Tilottama"],
+};
+
 // e.g. "Bagmati Province" / "Bagmati Pradesh" → "bagmati".
 const norm = (s: string) => s.toLowerCase().replace(/province|pradesh|district/g, "").replace(/[^a-z]/g, "");
 
@@ -79,9 +92,26 @@ function provinceOfDistrict(district: string): string {
 
 export function StepLocation({ formData, onChange, errors }: StepLocationProps) {
   const { province, district, city, wardNo, area, landmark, coordinates } = formData;
-  const mapCenter = (district && DISTRICT_CENTERS[district]) || DEFAULT_CENTER;
   const pinColor = formData.listingType === "For Rent" ? "#157A74" : "#B05B33";
   const [geoLoading, setGeoLoading] = useState(false);
+  const [geoCenter, setGeoCenter] = useState<LatLng | null>(null);
+
+  // Address → map: once there's no pin, recenter the map on the typed address
+  // (debounced). A dropped pin takes precedence, so this stops once one exists.
+  useEffect(() => {
+    if (coordinates) return;
+    // Ward pins to a "City-Ward" locality (matches OSM naming), else the area/city.
+    const locality = wardNo && city ? `${city}-${wardNo}` : city;
+    const query = [area, locality, district].filter(Boolean).join(", ");
+    if (!query) return;
+    const t = setTimeout(async () => {
+      const hits = await searchPlaces(`${query}, Nepal`, 1);
+      if (hits[0]) setGeoCenter({ lat: hits[0].lat, lng: hits[0].lng });
+    }, 700);
+    return () => clearTimeout(t);
+  }, [area, city, wardNo, district, coordinates]);
+
+  const mapCenter = geoCenter ?? ((district && DISTRICT_CENTERS[district]) || DEFAULT_CENTER);
 
   const handleUpdate = (fields: Partial<PropertyFormData>) => {
     onChange({ ...formData, ...fields });
@@ -107,6 +137,7 @@ export function StepLocation({ formData, onChange, errors }: StepLocationProps) 
       if (matchedProvince) patch.province = matchedProvince;
       if (matchedDistrict) patch.district = matchedDistrict;
       if (addr.city) patch.city = addr.city;
+      if (addr.ward) patch.wardNo = addr.ward;
       if (addr.area) patch.area = addr.area;
       if (addr.landmark) patch.landmark = addr.landmark;
       handleUpdate(patch);
@@ -121,14 +152,22 @@ export function StepLocation({ formData, onChange, errors }: StepLocationProps) 
   };
 
   const handleProvinceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedProvince = e.target.value;
     handleUpdate({
-      province: selectedProvince,
-      district: "", // reset district on province change
+      province: e.target.value,
+      district: "", // reset the dependent fields on province change
+      city: "",
+    });
+  };
+
+  const handleDistrictChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    handleUpdate({
+      district: e.target.value,
+      city: "", // reset the dependent municipality on district change
     });
   };
 
   const districts = province ? DISTRICTS_BY_PROVINCE[province] || [] : [];
+  const municipalities = district ? MUNICIPALITIES_BY_DISTRICT[district] || [] : [];
 
   return (
     <div className="space-y-6">
@@ -163,7 +202,7 @@ export function StepLocation({ formData, onChange, errors }: StepLocationProps) 
               id="district-select"
               value={district || ""}
               disabled={!province}
-              onChange={(e) => handleUpdate({ district: e.target.value })}
+              onChange={handleDistrictChange}
               className="nm-input appearance-none cursor-pointer px-4 py-3 pr-10 text-xs font-semibold"
             >
               <option value="" disabled>Select District</option>
@@ -178,17 +217,27 @@ export function StepLocation({ formData, onChange, errors }: StepLocationProps) 
           )}
         </div>
 
-        {/* City / Municipality */}
+        {/* Municipality / VDC — datalist: district-filtered options, typeable */}
         <div>
-          <label htmlFor="city-input" className="nm-label">City / Municipality</label>
-          <input
-            id="city-input"
-            type="text"
-            value={city || ""}
-            onChange={(e) => handleUpdate({ city: e.target.value })}
-            placeholder="e.g. Lalitpur Metro"
-            className="nm-input px-4 py-3 text-xs font-semibold"
-          />
+          <label htmlFor="city-input" className="nm-label">Municipality / VDC</label>
+          <div className="relative">
+            <input
+              id="city-input"
+              type="text"
+              list="municipality-options"
+              value={city || ""}
+              disabled={!district}
+              onChange={(e) => handleUpdate({ city: e.target.value })}
+              placeholder={district ? "Select or type…" : "Select a district first"}
+              className="nm-input px-4 py-3 pr-10 text-xs font-semibold"
+            />
+            <datalist id="municipality-options">
+              {municipalities.map((m) => (
+                <option key={m} value={m} />
+              ))}
+            </datalist>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#342417]/50 pointer-events-none" />
+          </div>
           {errors.city && (
             <p className="mt-1.5 text-xs text-red-500 font-medium">{errors.city}</p>
           )}
