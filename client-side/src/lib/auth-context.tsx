@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { AUTH_REFRESHED_EVENT, AUTH_EXPIRED_EVENT } from "./api-client";
+import { API_BASE } from "./property-api";
 
 export interface User {
   id: string;
@@ -95,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const token = localStorage.getItem("nirmix_token");
       if (token) {
-        await fetch("http://localhost:5001/api/auth/logout", {
+        await fetch(`${API_BASE}/auth/logout`, {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${token}`,

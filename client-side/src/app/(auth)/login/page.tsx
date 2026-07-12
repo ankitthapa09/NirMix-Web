@@ -9,6 +9,7 @@ import { Eye, EyeOff, ArrowRight, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { loginSchema, type LoginInput } from "../schema";
 import { useAuth } from "@/lib/auth-context";
+import { API_BASE } from "@/lib/property-api";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -27,7 +28,7 @@ export default function LoginPage() {
   async function onSubmit(data: LoginInput) {
     setServerError("");
     try {
-      const res = await fetch("http://localhost:5001/api/auth/login", {
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),

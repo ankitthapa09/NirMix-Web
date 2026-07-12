@@ -1,7 +1,7 @@
 import type { Property, Lister, PropertyType } from "@/types/property";
 import type { PropertyFormData, MediaItem } from "@/features/dashboard/components/create-steps/types";
 
-export const API_BASE = "http://localhost:5001/api";
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:5001/api";
 
 export interface ApiOwner {
   _id: string;
@@ -178,6 +178,7 @@ export function apiPropertyToFormData(api: ApiProperty): Partial<PropertyFormDat
     wardNo: api.location.wardNo,
     area: api.location.area,
     landmark: api.location.landmark ?? "",
+    coordinates: api.location.coordinates,
     price: String(api.price),
     videoLink: api.videoLink ?? "",
     photos,

@@ -13,6 +13,7 @@ import { StepReview } from "./create-steps/StepReview";
 import { PropertyFormData, MediaItem, isMediaItem } from "./create-steps/types";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api-client";
+import { API_BASE } from "@/lib/property-api";
 
 const STEPS = [
   { label: "Basics", desc: "Type & Description" },
@@ -127,8 +128,6 @@ const sanitizeData = (input: unknown): PropertyFormData => {
     termsAccepted: !!data.termsAccepted,
   };
 };
-
-const API_BASE = "http://localhost:5001/api";
 
 // Fields sent top-level / handled separately; everything else on the wizard's flat
 // formData is bundled into `details` to match the API's create contract.
