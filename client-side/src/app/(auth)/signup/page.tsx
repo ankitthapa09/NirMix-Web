@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { registerSchema, type RegisterInput } from "../schema";
 import { useAuth } from "@/lib/auth-context";
+import { API_BASE } from "@/lib/property-api";
 import { toast } from "sonner";
 
 export default function SignupPage() {
@@ -35,7 +36,7 @@ export default function SignupPage() {
   async function onSubmit(data: RegisterInput) {
     setServerError("");
     try {
-      const res = await fetch("http://localhost:5001/api/auth/register", {
+      const res = await fetch(`${API_BASE}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),

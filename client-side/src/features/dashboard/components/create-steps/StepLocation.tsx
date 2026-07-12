@@ -1,9 +1,35 @@
 "use client";
 
-import { MapPin, ChevronDown } from "lucide-react";
+import dynamic from "next/dynamic";
+import { useState, useEffect } from "react";
+import { MapPin, ChevronDown, Loader2 } from "lucide-react";
 import { PropertyFormData, StepProps } from "./types";
+import type { LatLng } from "./LocationPicker";
+import { reverseGeocode, searchPlaces } from "@/lib/geocode";
+
+// Leaflet touches `window`, so the picker must never render during SSR.
+const LocationPicker = dynamic(() => import("./LocationPicker"), {
+  ssr: false,
+  loading: () => (
+    <div className="nm-recessed flex h-64 w-full items-center justify-center text-xs font-semibold text-[#342417]/55">
+      Loading map…
+    </div>
+  ),
+});
 
 type StepLocationProps = StepProps;
+
+// Rough district centers so the map opens near the listing; falls back to Kathmandu.
+const DISTRICT_CENTERS: Record<string, LatLng> = {
+  Kathmandu: { lat: 27.7172, lng: 85.324 },
+  Lalitpur: { lat: 27.6588, lng: 85.3247 },
+  Bhaktapur: { lat: 27.671, lng: 85.4298 },
+  Kaski: { lat: 28.2096, lng: 83.9856 },
+  Morang: { lat: 26.6646, lng: 87.2718 },
+  Sunsari: { lat: 26.6265, lng: 87.1718 },
+  Rupandehi: { lat: 27.6244, lng: 83.4419 },
+};
+const DEFAULT_CENTER: LatLng = { lat: 27.7172, lng: 85.324 };
 
 const PROVINCES = [
   "Koshi Province",
@@ -25,22 +51,123 @@ const DISTRICTS_BY_PROVINCE: Record<string, string[]> = {
   "Sudurpashchim Province": ["Bajura", "Bajhang", "Darchula", "Baitadi", "Dadeldhura", "Kanchanpur", "Doti", "Kailali", "Achham"],
 };
 
+const ALL_DISTRICTS = Object.values(DISTRICTS_BY_PROVINCE).flat();
+
+// Local units (municipalities / rural municipalities-VDCs) for the major
+// districts. Used as datalist suggestions — the field still accepts free text
+// for districts not covered here.
+const MUNICIPALITIES_BY_DISTRICT: Record<string, string[]> = {
+  Kathmandu: ["Kathmandu Metropolitan City", "Budhanilkantha", "Tokha", "Gokarneshwor", "Kageshwori Manohara", "Chandragiri", "Tarakeshwor", "Nagarjun", "Kirtipur", "Shankharapur", "Dakshinkali"],
+  Lalitpur: ["Lalitpur Metropolitan City", "Godawari", "Mahalaxmi", "Konjyosom", "Bagmati", "Mahankal"],
+  Bhaktapur: ["Bhaktapur", "Madhyapur Thimi", "Changunarayan", "Suryabinayak"],
+  Kaski: ["Pokhara Metropolitan City", "Annapurna", "Machhapuchhre", "Madi", "Rupa"],
+  Morang: ["Biratnagar Metropolitan City", "Sundar Haraincha", "Belbari", "Pathari Shanishchare", "Urlabari", "Rangeli", "Letang", "Sunwarshi", "Ratuwamai"],
+  Sunsari: ["Itahari", "Dharan", "Inaruwa", "Duhabi", "Ramdhuni", "Barah", "Koshi", "Barju", "Bhokraha", "Harinagar", "Dewanganj", "Gadhi"],
+  Rupandehi: ["Butwal", "Siddharthanagar", "Devdaha", "Lumbini Sanskritik", "Sainamaina", "Tilottama"],
+};
+
+// e.g. "Bagmati Province" / "Bagmati Pradesh" → "bagmati".
+const norm = (s: string) => s.toLowerCase().replace(/province|pradesh|district/g, "").replace(/[^a-z]/g, "");
+
+/** Map a geocoded state name onto one of the seven province options (best-effort). */
+function matchProvince(state?: string): string {
+  if (!state) return "";
+  const n = norm(state);
+  if (!n) return "";
+  return PROVINCES.find((p) => norm(p) === n || norm(p).includes(n) || n.includes(norm(p))) ?? "";
+}
+
+/** Map a geocoded district name onto a district option (searched across all provinces). */
+function matchDistrict(district?: string): string {
+  if (!district) return "";
+  const n = norm(district);
+  if (!n) return "";
+  return ALL_DISTRICTS.find((d) => norm(d) === n || norm(d).includes(n) || n.includes(norm(d))) ?? "";
+}
+
+/** The province that owns a district (first match). */
+function provinceOfDistrict(district: string): string {
+  return Object.entries(DISTRICTS_BY_PROVINCE).find(([, list]) => list.includes(district))?.[0] ?? "";
+}
+
 export function StepLocation({ formData, onChange, errors }: StepLocationProps) {
-  const { province, district, city, wardNo, area, landmark } = formData;
+  const { province, district, city, wardNo, area, landmark, coordinates } = formData;
+  const pinColor = formData.listingType === "For Rent" ? "#157A74" : "#B05B33";
+  const [geoLoading, setGeoLoading] = useState(false);
+  const [geoCenter, setGeoCenter] = useState<LatLng | null>(null);
+
+  // Address → map: once there's no pin, recenter the map on the typed address
+  // (debounced). A dropped pin takes precedence, so this stops once one exists.
+  useEffect(() => {
+    if (coordinates) return;
+    // Ward pins to a "City-Ward" locality (matches OSM naming), else the area/city.
+    const locality = wardNo && city ? `${city}-${wardNo}` : city;
+    const query = [area, locality, district].filter(Boolean).join(", ");
+    if (!query) return;
+    const t = setTimeout(async () => {
+      const hits = await searchPlaces(`${query}, Nepal`, 1);
+      if (hits[0]) setGeoCenter({ lat: hits[0].lat, lng: hits[0].lng });
+    }, 700);
+    return () => clearTimeout(t);
+  }, [area, city, wardNo, district, coordinates]);
+
+  const mapCenter = geoCenter ?? ((district && DISTRICT_CENTERS[district]) || DEFAULT_CENTER);
 
   const handleUpdate = (fields: Partial<PropertyFormData>) => {
     onChange({ ...formData, ...fields });
   };
 
+  // Reverse-geocode the pin and auto-fill the address; province/district are
+  // matched to our fixed option lists, city/area/landmark are free-filled.
+  const applyGeocode = async (coords: LatLng) => {
+    setGeoLoading(true);
+    try {
+      const addr = await reverseGeocode(coords.lat, coords.lng);
+      if (!addr) return;
+
+      // District names are reliable; province is inferred from the district
+      // when the state name doesn't match (OSM sometimes misspells provinces).
+      const matchedDistrict = matchDistrict(addr.district);
+      let matchedProvince = matchProvince(addr.province) || provinceOfDistrict(matchedDistrict);
+      if (matchedDistrict && matchedProvince && !DISTRICTS_BY_PROVINCE[matchedProvince]?.includes(matchedDistrict)) {
+        matchedProvince = provinceOfDistrict(matchedDistrict);
+      }
+
+      const patch: Partial<PropertyFormData> = { coordinates: coords };
+      if (matchedProvince) patch.province = matchedProvince;
+      if (matchedDistrict) patch.district = matchedDistrict;
+      if (addr.city) patch.city = addr.city;
+      if (addr.ward) patch.wardNo = addr.ward;
+      if (addr.area) patch.area = addr.area;
+      if (addr.landmark) patch.landmark = addr.landmark;
+      handleUpdate(patch);
+    } finally {
+      setGeoLoading(false);
+    }
+  };
+
+  const handlePin = (coords: LatLng) => {
+    handleUpdate({ coordinates: coords }); // drop the pin instantly
+    void applyGeocode(coords); // then fill the address
+  };
+
   const handleProvinceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedProvince = e.target.value;
     handleUpdate({
-      province: selectedProvince,
-      district: "", // reset district on province change
+      province: e.target.value,
+      district: "", // reset the dependent fields on province change
+      city: "",
+    });
+  };
+
+  const handleDistrictChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    handleUpdate({
+      district: e.target.value,
+      city: "", // reset the dependent municipality on district change
     });
   };
 
   const districts = province ? DISTRICTS_BY_PROVINCE[province] || [] : [];
+  const municipalities = district ? MUNICIPALITIES_BY_DISTRICT[district] || [] : [];
 
   return (
     <div className="space-y-6">
@@ -75,7 +202,7 @@ export function StepLocation({ formData, onChange, errors }: StepLocationProps) 
               id="district-select"
               value={district || ""}
               disabled={!province}
-              onChange={(e) => handleUpdate({ district: e.target.value })}
+              onChange={handleDistrictChange}
               className="nm-input appearance-none cursor-pointer px-4 py-3 pr-10 text-xs font-semibold"
             >
               <option value="" disabled>Select District</option>
@@ -90,17 +217,27 @@ export function StepLocation({ formData, onChange, errors }: StepLocationProps) 
           )}
         </div>
 
-        {/* City / Municipality */}
+        {/* Municipality / VDC — datalist: district-filtered options, typeable */}
         <div>
-          <label htmlFor="city-input" className="nm-label">City / Municipality</label>
-          <input
-            id="city-input"
-            type="text"
-            value={city || ""}
-            onChange={(e) => handleUpdate({ city: e.target.value })}
-            placeholder="e.g. Lalitpur Metro"
-            className="nm-input px-4 py-3 text-xs font-semibold"
-          />
+          <label htmlFor="city-input" className="nm-label">Municipality / VDC</label>
+          <div className="relative">
+            <input
+              id="city-input"
+              type="text"
+              list="municipality-options"
+              value={city || ""}
+              disabled={!district}
+              onChange={(e) => handleUpdate({ city: e.target.value })}
+              placeholder={district ? "Select or type…" : "Select a district first"}
+              className="nm-input px-4 py-3 pr-10 text-xs font-semibold"
+            />
+            <datalist id="municipality-options">
+              {municipalities.map((m) => (
+                <option key={m} value={m} />
+              ))}
+            </datalist>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#342417]/50 pointer-events-none" />
+          </div>
           {errors.city && (
             <p className="mt-1.5 text-xs text-red-500 font-medium">{errors.city}</p>
           )}
@@ -152,32 +289,47 @@ export function StepLocation({ formData, onChange, errors }: StepLocationProps) 
         </div>
       </div>
 
-      {/* Interactive Map Placeholder — carved into the board */}
+      {/* Interactive Map — pin the exact location */}
       <div className="pt-2">
-        <label className="nm-label">Pin Exact Location</label>
-        <div className="nm-recessed relative w-full h-64 flex flex-col items-center justify-center cursor-pointer group overflow-hidden">
-          {/* Mock Map Background graphic */}
-          <div className="absolute inset-0 opacity-15 pointer-events-none rounded-2xl overflow-hidden bg-[radial-gradient(circle_at_center,_#342417_1.5px,_transparent_1.5px)] bg-[size:16px_16px] flex items-center justify-center">
-            {/* mock grid lines */}
-            <div className="w-full h-full border-t border-b border-[#342417]/30 flex flex-col justify-around">
-              <div className="h-[1px] bg-[#342417]/10" />
-              <div className="h-[1px] bg-[#342417]/10" />
-            </div>
-          </div>
-          
-          <div
-            className="z-10 p-4 rounded-full mb-3 group-hover:scale-110 transition-transform duration-300 shadow-sm"
-            style={{ backgroundColor: "var(--nm-accent-soft)", color: "var(--nm-accent)" }}
-          >
-            <MapPin className="h-7 w-7" />
-          </div>
-          <span className="z-10 text-sm font-bold text-[#342417]">
-            Drag & Drop Pin or Click to Select
-          </span>
-          <span className="z-10 text-xs text-[#342417]/55 mt-1">
-            Pinning exact location increases buyer trust by 45%.
-          </span>
+        <div className="mb-2 flex items-center justify-between">
+          <label className="nm-label mb-0">Pin Exact Location</label>
+          {coordinates && (
+            <button
+              type="button"
+              onClick={() => handleUpdate({ coordinates: undefined })}
+              className="text-xs font-semibold text-[#B05B33] hover:underline"
+            >
+              Clear pin
+            </button>
+          )}
         </div>
+
+        <div className="nm-recessed relative w-full overflow-hidden rounded-2xl">
+          <LocationPicker
+            value={coordinates}
+            defaultCenter={mapCenter}
+            onChange={handlePin}
+            onClear={() => handleUpdate({ coordinates: undefined })}
+            color={pinColor}
+            className="h-64 w-full"
+          />
+        </div>
+
+        <p className="mt-2 text-xs text-[#342417]/55">
+          {geoLoading ? (
+            <span className="inline-flex items-center gap-1.5 font-semibold text-[#342417]/70">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Detecting address from pin…
+            </span>
+          ) : coordinates ? (
+            <span className="inline-flex items-center gap-1.5 font-semibold text-[#342417]/70">
+              <MapPin className="h-3.5 w-3.5" style={{ color: "var(--nm-accent)" }} />
+              {coordinates.lat.toFixed(5)}, {coordinates.lng.toFixed(5)} · address auto-filled from pin
+            </span>
+          ) : (
+            "Click the map to drop a pin — the address fields fill in automatically. Drag to fine-tune."
+          )}
+        </p>
       </div>
     </div>
   );

@@ -9,7 +9,7 @@ export interface MediaItem {
 }
 
 // The wizard's form is mostly known fields, but the Details step also writes a
-// number of property-type-specific keys (houseType, bhkType, plotType, …) that
+// number of property-type-specific keys (houseType, bhkType, plotType) that
 // are addressed dynamically. The index signature covers those while the named
 // fields keep their concrete types for the rest of the flow.
 export interface PropertyFormData {
@@ -23,6 +23,8 @@ export interface PropertyFormData {
   wardNo: string;
   area: string;
   landmark: string;
+  /** Exact map pin set in the Location step; omitted until the user drops a pin. */
+  coordinates?: { lat: number; lng: number };
   price: string;
   negotiable: boolean;
   ownership: string;

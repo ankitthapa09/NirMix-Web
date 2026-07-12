@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api-client";
+import { API_BASE } from "@/lib/property-api";
 import {
   ShieldCheck,
   Bell,
@@ -221,7 +222,7 @@ export function SettingsPage() {
 
     setSavingPwd(true);
     try {
-      const res = await apiFetch("http://localhost:5001/api/users/me/password", {
+      const res = await apiFetch(`${API_BASE}/users/me/password`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ currentPassword: pwd.current, newPassword: pwd.next }),

@@ -13,6 +13,7 @@ import { StepReview } from "./create-steps/StepReview";
 import { PropertyFormData, MediaItem, isMediaItem } from "./create-steps/types";
 import { useAuth } from "@/lib/auth-context";
 import { apiFetch } from "@/lib/api-client";
+import { API_BASE } from "@/lib/property-api";
 
 const STEPS = [
   { label: "Basics", desc: "Type & Description" },
@@ -69,6 +70,12 @@ const INITIAL_FORM_STATE = {
   termsAccepted: false,
 };
 
+const isLatLng = (v: unknown): v is { lat: number; lng: number } =>
+  !!v &&
+  typeof v === "object" &&
+  typeof (v as Record<string, unknown>).lat === "number" &&
+  typeof (v as Record<string, unknown>).lng === "number";
+
 const sanitizeData = (input: unknown): PropertyFormData => {
   if (!input || typeof input !== "object") return INITIAL_FORM_STATE;
   const data = input as Record<string, unknown>;
@@ -84,6 +91,7 @@ const sanitizeData = (input: unknown): PropertyFormData => {
     wardNo: typeof data.wardNo === "string" || typeof data.wardNo === "number" ? String(data.wardNo) : "",
     area: typeof data.area === "string" ? data.area : "",
     landmark: typeof data.landmark === "string" ? data.landmark : "",
+    coordinates: isLatLng(data.coordinates) ? data.coordinates : undefined,
     price: typeof data.price === "string" || typeof data.price === "number" ? String(data.price) : "",
     negotiable: data.negotiable !== false,
     ownership: typeof data.ownership === "string" ? data.ownership : "",
@@ -121,13 +129,11 @@ const sanitizeData = (input: unknown): PropertyFormData => {
   };
 };
 
-const API_BASE = "http://localhost:5001/api";
-
 // Fields sent top-level / handled separately; everything else on the wizard's flat
 // formData is bundled into `details` to match the API's create contract.
 const TOP_LEVEL_FIELDS = new Set([
   "listingType", "propertyType", "title", "description",
-  "province", "district", "city", "wardNo", "area", "landmark",
+  "province", "district", "city", "wardNo", "area", "landmark", "coordinates",
   "price", "videoLink",
   "photos", "floorPlan", "termsAccepted", "detailsCompletion", "isDetailsValid",
 ]);
@@ -152,6 +158,7 @@ const buildListingPayload = (formData: PropertyFormData) => {
       wardNo: formData.wardNo,
       area: formData.area,
       landmark: formData.landmark || "",
+      ...(formData.coordinates ? { coordinates: formData.coordinates } : {}),
     },
     price: Number(formData.price) || 0,
     videoLink: formData.videoLink || "",

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import {
   Search,
@@ -9,6 +10,8 @@ import {
   ChevronRight,
   MapPin,
   SearchX,
+  LayoutGrid,
+  Map as MapIcon,
 } from "lucide-react";
 
 import { Navbar } from "@/features/landing/components/Navbar";
@@ -26,6 +29,16 @@ import {
   DISTRICT_OPTIONS,
   CATEGORIES,
 } from "./types";
+
+// Leaflet touches `window`, so the browse map must never render during SSR.
+const PropertiesMap = dynamic(() => import("@/components/map/PropertiesMap"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[600px] w-full items-center justify-center rounded-2xl border border-mist bg-white/60 text-xs font-semibold text-[#5C4D3C]/60">
+      Loading map…
+    </div>
+  ),
+});
 
 interface PropertyListingPageProps {
   mode: ListingMode;
@@ -75,6 +88,7 @@ export function PropertyListingPage({ mode, initialType, initialStatus }: Proper
 
   const [allProps, setAllProps] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<"grid" | "map">("grid");
 
   useEffect(() => {
     let active = true;
@@ -152,6 +166,8 @@ export function PropertyListingPage({ mode, initialType, initialStatus }: Proper
 
     return list;
   }, [data, filters]);
+
+  const pinnedCount = useMemo(() => results.filter((p) => p.coordinates).length, [results]);
 
   // Per-category counts respect the active status (Buy/Rent) but ignore the
   // selected category, so each card shows how many listings it would reveal.
@@ -297,17 +313,44 @@ export function PropertyListingPage({ mode, initialType, initialStatus }: Proper
                 {results.length === 1 ? resultNoun.one : resultNoun.many} found
                 {filters.category ? ` in ${filters.category}` : ""}
               </p>
-              <div className="relative">
-                <select
-                  value={filters.sort}
-                  onChange={(e) => update({ sort: e.target.value as ListingFilters["sort"] })}
-                  className="cursor-pointer appearance-none rounded-xl border border-mist bg-sand/60 py-2 pl-3 pr-9 text-xs font-bold text-[#342417] outline-none focus:border-[#342417]/30"
-                >
-                  {Object.entries(SORT_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#5C4D3C]/50" />
+              <div className="flex items-center gap-2">
+                {/* Grid / map view toggle */}
+                <div className="inline-flex rounded-xl border border-mist bg-sand/60 p-0.5">
+                  {([
+                    { k: "grid", label: "Grid", Icon: LayoutGrid },
+                    { k: "map", label: "Map", Icon: MapIcon },
+                  ] as const).map(({ k, label, Icon }) => {
+                    const active = view === k;
+                    return (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => setView(k)}
+                        aria-pressed={active}
+                        style={active ? { backgroundColor: accent, color: "#fff" } : undefined}
+                        className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
+                          active ? "shadow-sm" : "text-[#5C4D3C]/70 hover:text-[#342417]"
+                        }`}
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="relative">
+                  <select
+                    value={filters.sort}
+                    onChange={(e) => update({ sort: e.target.value as ListingFilters["sort"] })}
+                    className="cursor-pointer appearance-none rounded-xl border border-mist bg-sand/60 py-2 pl-3 pr-9 text-xs font-bold text-[#342417] outline-none focus:border-[#342417]/30"
+                  >
+                    {Object.entries(SORT_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#5C4D3C]/50" />
+                </div>
               </div>
             </div>
 
@@ -326,11 +369,25 @@ export function PropertyListingPage({ mode, initialType, initialStatus }: Proper
                 ))}
               </div>
             ) : results.length > 0 ? (
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                {results.map((property) => (
-                  <DashboardPropertyCard key={property.id} property={property} />
-                ))}
-              </div>
+              view === "map" ? (
+                <div className="space-y-3">
+                  {pinnedCount === 0 && (
+                    <p className="flex items-center gap-1.5 rounded-xl border border-dashed border-mist bg-[#FBF7EF] px-4 py-3 text-xs font-semibold text-[#5C4D3C]/70">
+                      <MapPin className="h-3.5 w-3.5" />
+                      None of these {results.length === 1 ? resultNoun.one : resultNoun.many} have a map pin yet — listings created with the new map picker will show here.
+                    </p>
+                  )}
+                  <div className="overflow-hidden rounded-2xl border border-mist">
+                    <PropertiesMap properties={results} className="h-[600px] w-full" />
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                  {results.map((property) => (
+                    <DashboardPropertyCard key={property.id} property={property} />
+                  ))}
+                </div>
+              )
             ) : (
               <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-mist bg-white/60 px-6 py-20 text-center">
                 <span
