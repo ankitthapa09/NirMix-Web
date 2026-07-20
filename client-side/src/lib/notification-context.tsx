@@ -24,6 +24,9 @@ interface NotificationContextType {
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
+/** How often to refetch notifications while the tab is open and visible. */
+const POLL_INTERVAL_MS = 60_000;
+
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
   const [notifications, setNotifications] = useState<ApiNotification[]>([]);
@@ -61,6 +64,23 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       active = false;
     };
   }, [isAuthenticated, isLoading]);
+
+  // Keep the badge live: poll while the tab is visible, and refetch the moment
+  // the user comes back to it. Hidden tabs are skipped so we don't poll wastefully.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const tick = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    const interval = setInterval(tick, POLL_INTERVAL_MS);
+    document.addEventListener("visibilitychange", tick);
+    window.addEventListener("focus", tick);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", tick);
+      window.removeEventListener("focus", tick);
+    };
+  }, [isAuthenticated, refresh]);
 
   // Derived from the list so the badge and the page can never disagree.
   const unreadCount = useMemo(
