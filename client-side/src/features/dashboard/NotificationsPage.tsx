@@ -3,18 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import {
-  Bell,
-  BellOff,
-  CalendarDays,
-  CheckCircle2,
-  Star,
-  LogIn,
-  ArrowRight,
-  Trash2,
-  CheckCheck,
-  type LucideIcon,
-} from "lucide-react";
+import { BellOff, LogIn, ArrowRight, Trash2, CheckCheck } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import {
   fetchNotifications,
@@ -22,28 +11,8 @@ import {
   markAllNotificationsRead,
   deleteNotification,
   type ApiNotification,
-  type NotificationType,
 } from "@/lib/notification-api";
-
-const ACCENT = "#B05B33";
-
-const TYPE_META: Record<NotificationType, { icon: LucideIcon; tint: string }> = {
-  visit_requested: { icon: CalendarDays, tint: "#B05B33" },
-  visit_status: { icon: CheckCircle2, tint: "#157A74" },
-  review_received: { icon: Star, tint: "#E5A93A" },
-};
-
-/** Short relative time, falling back to a date once it's over a week old. */
-function timeAgo(iso: string): string {
-  const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-}
+import { typeMeta, timeAgo, NOTIFICATION_ACCENT as ACCENT } from "./notification-ui";
 
 function RowSkeleton() {
   return (
@@ -173,7 +142,7 @@ export function NotificationsPage() {
       ) : (
         <div className="space-y-3">
           {items.map((n) => {
-            const meta = TYPE_META[n.type] ?? { icon: Bell, tint: ACCENT };
+            const meta = typeMeta(n.type);
             const Icon = meta.icon;
             return (
               <div
