@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Heart, MapPin, BedDouble, Bath, Maximize2, ArrowRight } from "lucide-react";
+import { Heart, MapPin, BedDouble, Bath, Maximize2, ArrowRight, Star } from "lucide-react";
 import type { Property } from "@/types/property";
 import { useSaved } from "@/lib/saved-context";
 
@@ -100,6 +100,19 @@ export function DashboardPropertyCard({ property }: DashboardPropertyCardProps) 
             {property.location.neighborhood}, {property.location.city}
           </span>
         </div>
+
+        {/* Rating — only once the listing has been reviewed */}
+        {(property.ratingCount ?? 0) > 0 && (
+          <div className="mt-2 flex items-center gap-1 text-[11px]">
+            <Star className="h-3.5 w-3.5 fill-[#E5A93A] text-[#E5A93A]" />
+            <span className="font-bold text-[#342417]">
+              {(property.ratingAverage ?? 0).toFixed(1)}
+            </span>
+            <span className="text-[#5C4D3C]/60">
+              ({property.ratingCount} review{property.ratingCount === 1 ? "" : "s"})
+            </span>
+          </div>
+        )}
 
         {/* Specs Row */}
         {property.type !== "Land" ? (

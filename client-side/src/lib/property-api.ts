@@ -32,6 +32,8 @@ export interface ApiProperty {
   };
   price: number;
   videoLink?: string;
+  ratingAverage?: number;
+  ratingCount?: number;
   details: Record<string, unknown>;
   photos: { url: string; publicId: string }[];
   floorPlan?: { url: string; publicId: string };
@@ -95,6 +97,8 @@ export function mapApiToProperty(api: ApiProperty): Property {
     coordinates: api.location.coordinates,
     wardNo: strOf(api.location.wardNo),
     landmark: strOf(api.location.landmark),
+    ratingAverage: api.ratingAverage ?? 0,
+    ratingCount: api.ratingCount ?? 0,
   };
 }
 

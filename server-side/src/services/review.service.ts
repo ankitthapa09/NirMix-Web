@@ -3,8 +3,9 @@ import {
   findReviewsByProperty,
   findReviewById,
   deleteReviewById,
+  getRatingStats,
 } from '../repositories/review.repository.js';
-import { findPropertyById } from '../repositories/property.repository.js';
+import { findPropertyById, updateProperty } from '../repositories/property.repository.js';
 import notificationService from './notification.service.js';
 import { IReview } from '../models/reviewModel.js';
 import { CreateReviewInput, ReviewSummary } from '../types/review.types.js';
@@ -27,11 +28,12 @@ function buildSummary(reviews: IReview[]): ReviewSummary {
   return { average, count, buckets };
 }
 
+async function syncPropertyRating(propertyId: string): Promise<void> {
+  const { average, count } = await getRatingStats(propertyId);
+  await updateProperty(propertyId, { ratingAverage: average, ratingCount: count });
+}
+
 class ReviewService {
-  /**
-   * Create or update the caller's review for a property. Owners can't review
-   * their own listing; re-submitting updates the existing review.
-   */
   async submitReview(authorId: string, data: CreateReviewInput): Promise<IReview> {
     const property = await findPropertyById(data.propertyId);
     if (!property) {
@@ -48,6 +50,8 @@ class ReviewService {
     if (!review) {
       throw new ApiError(HTTP_STATUS.INTERNAL, 'Failed to save review');
     }
+
+    await syncPropertyRating(data.propertyId);
 
     // Let the owner know their listing was reviewed (never blocks the review).
     await notificationService.notify({
@@ -81,6 +85,7 @@ class ReviewService {
       throw new ApiError(HTTP_STATUS.FORBIDDEN, 'You can only delete your own review');
     }
     await deleteReviewById(reviewId);
+    await syncPropertyRating(review.property.toString());
   }
 }
 

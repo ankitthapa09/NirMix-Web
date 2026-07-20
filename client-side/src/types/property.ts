@@ -54,4 +54,7 @@ export type Property = {
   /** Optional finer-grained address bits. */
   wardNo?: string;
   landmark?: string;
+  /** Review aggregate, denormalised on the listing (0 when unreviewed). */
+  ratingAverage?: number;
+  ratingCount?: number;
 };
