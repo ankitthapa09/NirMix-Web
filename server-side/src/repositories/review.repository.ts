@@ -27,3 +27,9 @@ export async function findReviewById(id: string): Promise<IReview | null> {
 export async function deleteReviewById(id: string): Promise<IReview | null> {
   return Review.findByIdAndDelete(id);
 }
+
+/** Remove every review for a property; returns how many were deleted. */
+export async function deleteReviewsByProperty(propertyId: string): Promise<number> {
+  const result = await Review.deleteMany({ property: propertyId });
+  return result.deletedCount ?? 0;
+}

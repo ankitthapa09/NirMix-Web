@@ -35,3 +35,12 @@ export async function markAllNotificationsRead(userId: string): Promise<number> 
 export async function deleteNotificationById(id: string): Promise<INotification | null> {
   return Notification.findByIdAndDelete(id);
 }
+
+/**
+ * Remove every notification tied to a property; returns how many were deleted.
+ * Used when a listing is deleted so notifications don't link to a dead page.
+ */
+export async function deleteNotificationsByProperty(propertyId: string): Promise<number> {
+  const result = await Notification.deleteMany({ property: propertyId });
+  return result.deletedCount ?? 0;
+}

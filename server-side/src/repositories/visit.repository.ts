@@ -23,3 +23,9 @@ export async function findVisitById(id: string): Promise<IVisit | null> {
 export async function updateVisit(id: string, updates: Partial<IVisit>): Promise<IVisit | null> {
   return Visit.findByIdAndUpdate(id, updates, { new: true, runValidators: true });
 }
+
+/** Remove every visit request for a property; returns how many were deleted. */
+export async function deleteVisitsByProperty(propertyId: string): Promise<number> {
+  const result = await Visit.deleteMany({ property: propertyId });
+  return result.deletedCount ?? 0;
+}

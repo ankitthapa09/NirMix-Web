@@ -11,6 +11,9 @@ import {
   deletePropertyById,
 } from '../repositories/property.repository.js';
 import { updateUser } from '../repositories/user.repository.js';
+import { deleteReviewsByProperty } from '../repositories/review.repository.js';
+import { deleteVisitsByProperty } from '../repositories/visit.repository.js';
+import { deleteNotificationsByProperty } from '../repositories/notification.repository.js';
 import { getNextSequence } from '../repositories/counter.repository.js';
 import { IProperty } from '../models/propertyModel.js';
 import {
@@ -30,10 +33,6 @@ export interface PropertyMediaFiles {
 }
 
 class PropertyService {
-  /**
-   * Stream a single in-memory file buffer to Cloudinary.
-   * `resource_type: 'auto'` covers both images and PDF floor plans.
-   */
   private uploadToCloudinary(file: Express.Multer.File, folder: string): Promise<IPropertyMedia> {
     return new Promise<IPropertyMedia>((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
@@ -49,10 +48,6 @@ class PropertyService {
     });
   }
 
-  /**
-   * Create a property listing: upload media to Cloudinary, persist the document,
-   * and mark the owner as having posted a property.
-   */
   async createListing(
     ownerId: string,
     data: CreatePropertyInput,
@@ -125,11 +120,6 @@ class PropertyService {
     return property;
   }
 
-  /**
-   * Update a listing the user owns. Diffs media against what the client kept:
-   * removes dropped images from Cloudinary, uploads new ones. Listing/property
-   * type and the reference code are preserved.
-   */
   async updateListing(
     ownerId: string,
     propertyId: string,
@@ -196,9 +186,7 @@ class PropertyService {
     return updated;
   }
 
-  /**
-   * Delete a listing the user owns, removing its Cloudinary media too.
-   */
+  // Delete a listing the user owns, removing its Cloudinary media too.
   async deleteListing(ownerId: string, propertyId: string): Promise<void> {
     const property = await findPropertyById(propertyId);
     if (!property) {
@@ -208,7 +196,7 @@ class PropertyService {
       throw new ApiError(HTTP_STATUS.FORBIDDEN, 'You can only delete your own listings');
     }
 
-    // Best-effort removal of media from Cloudinary so deletes don't leave orphans.
+    // Best effort removal of media from Cloudinary so deletes don't leave orphans.
     const publicIds = [
       ...property.photos.map((p) => p.publicId),
       ...(property.floorPlan ? [property.floorPlan.publicId] : []),
@@ -216,6 +204,12 @@ class PropertyService {
     await Promise.all(
       publicIds.map((id) => cloudinary.uploader.destroy(id).catch(() => undefined))
     );
+
+    await Promise.all([
+      deleteReviewsByProperty(propertyId),
+      deleteVisitsByProperty(propertyId),
+      deleteNotificationsByProperty(propertyId),
+    ]);
 
     await deletePropertyById(propertyId);
   }
