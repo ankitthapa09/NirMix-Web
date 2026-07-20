@@ -9,6 +9,7 @@ import userRoutes from './src/routes/user.routes.js';
 import portfolioRoutes from './src/routes/portfolio.routes.js';
 import visitRoutes from './src/routes/visit.routes.js';
 import reviewRoutes from './src/routes/review.routes.js';
+import notificationRoutes from './src/routes/notification.routes.js';
 import { errorHandler, notFoundHandler } from './src/middlewares/error.middleware.js';
 import 'dotenv/config';
 
@@ -54,6 +55,9 @@ app.use('/api/visits', visitRoutes);
 
 // Review Routes
 app.use('/api/reviews', reviewRoutes);
+
+// Notification Routes
+app.use('/api/notifications', notificationRoutes);
 
 // ERROR HANDLING 
 

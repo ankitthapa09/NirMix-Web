@@ -5,6 +5,7 @@ import {
   deleteReviewById,
 } from '../repositories/review.repository.js';
 import { findPropertyById } from '../repositories/property.repository.js';
+import notificationService from './notification.service.js';
 import { IReview } from '../models/reviewModel.js';
 import { CreateReviewInput, ReviewSummary } from '../types/review.types.js';
 import { ApiError } from '../utils/ApiError.js';
@@ -47,6 +48,17 @@ class ReviewService {
     if (!review) {
       throw new ApiError(HTTP_STATUS.INTERNAL, 'Failed to save review');
     }
+
+    // Let the owner know their listing was reviewed (never blocks the review).
+    await notificationService.notify({
+      user: property.owner.toString(),
+      type: 'review_received',
+      title: 'New review',
+      message: `Your listing “${property.title}” received a ${data.rating}-star review.`,
+      property: data.propertyId,
+      link: `/properties/${data.propertyId}`,
+    });
+
     return review.populate('author', 'name displayName avatar');
   }
 
