@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 
 import { AuthProvider } from "@/lib/auth-context";
 import { SavedProvider } from "@/lib/saved-context";
+import { NotificationProvider } from "@/lib/notification-context";
 import { Toaster } from "sonner";
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -24,7 +25,9 @@ export function Providers({ children }: { children: ReactNode }) {
     <QueryClientProvider client={client}>
       <AuthProvider>
         <SavedProvider>
-          {children}
+          <NotificationProvider>
+            {children}
+          </NotificationProvider>
         </SavedProvider>
         <Toaster
           position="top-right" 

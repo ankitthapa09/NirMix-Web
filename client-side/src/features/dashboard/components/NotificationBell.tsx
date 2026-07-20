@@ -2,15 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { toast } from "sonner";
 import { Bell, BellOff, CheckCheck, ArrowRight } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import {
-  fetchNotifications,
-  markNotificationRead,
-  markAllNotificationsRead,
-  type ApiNotification,
-} from "@/lib/notification-api";
+import { useNotifications } from "@/lib/notification-context";
+import type { ApiNotification } from "@/lib/notification-api";
 import { typeMeta, timeAgo, NOTIFICATION_ACCENT } from "../notification-ui";
 
 /** Most recent notifications shown in the dropdown; the rest live on the full page. */
@@ -18,29 +13,9 @@ const MAX_ITEMS = 8;
 
 export function NotificationBell() {
   const { user } = useAuth();
-  const [items, setItems] = useState<ApiNotification[]>([]);
-  const [unread, setUnread] = useState(0);
+  const { notifications, unreadCount: unread, markRead, markAllRead } = useNotifications();
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
-
-  // Load once the user is known; silent on failure (badge just stays hidden).
-  useEffect(() => {
-    if (!user) return;
-    let active = true;
-    (async () => {
-      try {
-        const data = await fetchNotifications();
-        if (!active) return;
-        setItems(data.notifications);
-        setUnread(data.unreadCount);
-      } catch {
-        // ignore
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [user]);
 
   // Close on outside click / Escape.
   useEffect(() => {
@@ -59,28 +34,15 @@ export function NotificationBell() {
     };
   }, [open]);
 
-  // Optimistic — the row is already navigating, so don't block on the request.
+  // The context marks read optimistically, so this never blocks navigation.
   const handleOpenItem = (n: ApiNotification) => {
     setOpen(false);
-    if (n.read) return;
-    setItems((prev) => prev.map((x) => (x._id === n._id ? { ...x, read: true } : x)));
-    setUnread((u) => Math.max(0, u - 1));
-    void markNotificationRead(n._id).catch(() => {});
-  };
-
-  const handleMarkAll = async () => {
-    try {
-      await markAllNotificationsRead();
-      setItems((prev) => prev.map((x) => ({ ...x, read: true })));
-      setUnread(0);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Couldn’t mark all as read.");
-    }
+    markRead(n._id);
   };
 
   if (!user) return null;
 
-  const visible = items.slice(0, MAX_ITEMS);
+  const visible = notifications.slice(0, MAX_ITEMS);
 
   return (
     <div ref={wrapperRef} className="relative">
@@ -112,7 +74,7 @@ export function NotificationBell() {
             {unread > 0 && (
               <button
                 type="button"
-                onClick={handleMarkAll}
+                onClick={() => void markAllRead()}
                 className="inline-flex items-center gap-1 text-[11px] font-bold text-[#5C4D3C]/70 transition hover:text-[#342417] cursor-pointer"
               >
                 <CheckCheck className="h-3.5 w-3.5" />

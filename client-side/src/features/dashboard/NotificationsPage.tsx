@@ -1,17 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { BellOff, LogIn, ArrowRight, Trash2, CheckCheck } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import {
-  fetchNotifications,
-  markNotificationRead,
-  markAllNotificationsRead,
-  deleteNotification,
-  type ApiNotification,
-} from "@/lib/notification-api";
+import { useNotifications } from "@/lib/notification-context";
+import type { ApiNotification } from "@/lib/notification-api";
 import { typeMeta, timeAgo, NOTIFICATION_ACCENT as ACCENT } from "./notification-ui";
 
 function RowSkeleton() {
@@ -28,58 +22,21 @@ function RowSkeleton() {
 
 export function NotificationsPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const [items, setItems] = useState<ApiNotification[]>([]);
-  const [unread, setUnread] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const {
+    notifications: items,
+    unreadCount: unread,
+    loading,
+    markRead,
+    markAllRead,
+    remove,
+  } = useNotifications();
 
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    let active = true;
-    (async () => {
-      try {
-        const data = await fetchNotifications();
-        if (!active) return;
-        setItems(data.notifications);
-        setUnread(data.unreadCount);
-      } catch {
-        // Fall through to the empty state.
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [isAuthenticated]);
-
-  // Optimistic — the row is already navigating, so don't block on the request.
-  const handleOpen = (n: ApiNotification) => {
-    if (n.read) return;
-    setItems((prev) => prev.map((x) => (x._id === n._id ? { ...x, read: true } : x)));
-    setUnread((u) => Math.max(0, u - 1));
-    void markNotificationRead(n._id).catch(() => {});
-  };
+  // The context marks read optimistically, so this never blocks navigation.
+  const handleOpen = (n: ApiNotification) => markRead(n._id);
 
   const handleMarkAll = async () => {
-    try {
-      await markAllNotificationsRead();
-      setItems((prev) => prev.map((x) => ({ ...x, read: true })));
-      setUnread(0);
-      toast.success("All notifications marked as read.");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Couldn’t mark all as read.");
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    const target = items.find((x) => x._id === id);
-    try {
-      await deleteNotification(id);
-      setItems((prev) => prev.filter((x) => x._id !== id));
-      if (target && !target.read) setUnread((u) => Math.max(0, u - 1));
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Couldn’t delete the notification.");
-    }
+    await markAllRead();
+    toast.success("All notifications marked as read.");
   };
 
   return (
@@ -175,7 +132,7 @@ export function NotificationsPage() {
 
                 <button
                   type="button"
-                  onClick={() => handleDelete(n._id)}
+                  onClick={() => void remove(n._id)}
                   aria-label="Delete notification"
                   className="shrink-0 rounded-lg p-1.5 text-[#5C4D3C]/40 transition hover:bg-red-50 hover:text-red-500 cursor-pointer"
                 >
