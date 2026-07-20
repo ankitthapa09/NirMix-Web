@@ -3,8 +3,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Bell } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { NotificationBell } from "./NotificationBell";
 
 interface DashboardNavbarProps {
   onMenuOpen: () => void;
@@ -72,15 +72,7 @@ export function DashboardNavbar({ onMenuOpen }: DashboardNavbarProps) {
             Home
           </Link>
 
-          <button
-            type="button"
-            className="relative flex h-11 w-11 items-center justify-center rounded-full text-white/80 transition hover:bg-white/10 hover:text-white cursor-pointer"
-            aria-label="Notifications"
-          >
-            <Bell className="h-8 w-8 text-black" />
-            {/* Notification dot */}
-            <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-red-500 border-2 border-[#4A5544]" />
-          </button>
+          <NotificationBell />
 
           {/* Avatar */}
           <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#FFC71E]/80 bg-[#342417] text-sm font-bold text-white">

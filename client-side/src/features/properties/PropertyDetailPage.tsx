@@ -3,11 +3,18 @@
 import Image from "next/image";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { useSaved } from "@/lib/saved-context";
 import { useAuth } from "@/lib/auth-context";
 import { scheduleVisit } from "@/lib/visit-api";
+import {
+  fetchPropertyReviews,
+  submitReview,
+  deleteReview,
+  type ApiReview,
+  type ReviewSummary,
+} from "@/lib/review-api";
 import { OwnerVisitRequests } from "./components/OwnerVisitRequests";
 import {
   MapPin,
@@ -122,32 +129,9 @@ const LISTER_BADGE: Record<Lister["type"], { icon: typeof User; tint: string }> 
   Builder: { icon: Home, tint: "#7A5418" },
 };
 
-interface Review {
-  id: number;
-  name: string;
-  rating: number;
-  comment: string;
-  date: string;
-}
-
-const SEED_REVIEWS: Review[] = [
-  {
-    id: 1,
-    name: "Anita Gurung",
-    rating: 5,
-    comment:
-      "Exactly as described — the photos match the actual property. The agent was responsive and the visit was smooth. Loved the natural light and the neighbourhood.",
-    date: "2026-06-18",
-  },
-  {
-    id: 2,
-    name: "Prakash Shrestha",
-    rating: 4,
-    comment:
-      "Great location with easy road access. Slightly above my budget but the build quality is solid. Would recommend scheduling a visit early.",
-    date: "2026-06-10",
-  },
-];
+/** Display name for a review's author (populated by the API). */
+const authorName = (r: ApiReview): string =>
+  typeof r.author === "object" ? r.author.displayName || r.author.name : "NirMix User";
 
 // Row of 5 stars; pass a fractional value to fill proportionally.
 function Stars({ value, size = "h-4 w-4" }: { value: number; size?: string }) {
@@ -221,34 +205,74 @@ export function PropertyDetailPage({ property, backTo }: PropertyDetailPageProps
     }
   };
 
-  // Reviews
-  const [reviews, setReviews] = useState<Review[]>(SEED_REVIEWS);
-  const [reviewForm, setReviewForm] = useState({ rating: 0, comment: "", name: "" });
+  // Reviews — loaded from the API; the author comes from the signed-in user.
+  const [reviews, setReviews] = useState<ApiReview[]>([]);
+  const [summary, setSummary] = useState<ReviewSummary>({ average: 0, count: 0, buckets: {} });
+  const [reviewForm, setReviewForm] = useState({ rating: 0, comment: "" });
   const [hoverRating, setHoverRating] = useState(0);
+  const [submittingReview, setSubmittingReview] = useState(false);
 
-  const avgRating = reviews.length
-    ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
-    : 0;
+  const loadReviews = useCallback(async () => {
+    const data = await fetchPropertyReviews(property.id);
+    setReviews(data.reviews);
+    setSummary(data.summary);
+  }, [property.id]);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const data = await fetchPropertyReviews(property.id);
+      if (!active) return;
+      setReviews(data.reviews);
+      setSummary(data.summary);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [property.id]);
+
+  // The caller's own review, if any — submitting again updates it (server upserts).
+  const myReview = user
+    ? reviews.find((r) => typeof r.author === "object" && r.author._id === user.id)
+    : undefined;
+
   const ratingBuckets = [5, 4, 3, 2, 1].map((star) => ({
     star,
-    count: reviews.filter((r) => r.rating === star).length,
+    count: summary.buckets?.[String(star)] ?? 0,
   }));
 
-  const submitReview = (e: React.FormEvent) => {
+  const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return toast.error("Please log in to write a review.");
     if (reviewForm.rating === 0) return toast.error("Please pick a star rating.");
     if (!reviewForm.comment.trim()) return toast.error("Please write a short review.");
-    const entry: Review = {
-      id: Date.now(),
-      name: reviewForm.name.trim() || "Anonymous",
-      rating: reviewForm.rating,
-      comment: reviewForm.comment.trim(),
-      date: new Date().toISOString(),
-    };
-    setReviews((r) => [entry, ...r]);
-    setReviewForm({ rating: 0, comment: "", name: "" });
-    setHoverRating(0);
-    toast.success("Thanks! Your review has been posted.");
+
+    setSubmittingReview(true);
+    try {
+      await submitReview({
+        propertyId: property.id,
+        rating: reviewForm.rating,
+        comment: reviewForm.comment.trim(),
+      });
+      setReviewForm({ rating: 0, comment: "" });
+      setHoverRating(0);
+      await loadReviews();
+      toast.success(myReview ? "Your review has been updated." : "Thanks! Your review has been posted.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn’t post your review. Please try again.");
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
+
+  const handleDeleteReview = async (id: string) => {
+    try {
+      await deleteReview(id);
+      await loadReviews();
+      toast.success("Your review has been removed.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn’t delete the review.");
+    }
   };
 
   const initials = lister.name
@@ -588,17 +612,17 @@ export function PropertyDetailPage({ property, backTo }: PropertyDetailPageProps
               {/* Summary */}
               <div className="flex flex-col gap-5 border-b border-mist pb-6 sm:flex-row sm:items-center">
                 <div className="flex flex-col items-center justify-center rounded-2xl bg-[#FBF7EF] px-6 py-4 sm:w-44">
-                  <span className="text-4xl font-extrabold leading-none text-[#342417]">{avgRating.toFixed(1)}</span>
+                  <span className="text-4xl font-extrabold leading-none text-[#342417]">{summary.average.toFixed(1)}</span>
                   <div className="mt-2">
-                    <Stars value={avgRating} />
+                    <Stars value={summary.average} />
                   </div>
                   <span className="mt-1.5 text-[11px] font-semibold text-[#5C4D3C]/60">
-                    {reviews.length} review{reviews.length !== 1 ? "s" : ""}
+                    {summary.count} review{summary.count !== 1 ? "s" : ""}
                   </span>
                 </div>
                 <div className="flex-1 space-y-1.5">
                   {ratingBuckets.map((b) => {
-                    const pct = reviews.length ? (b.count / reviews.length) * 100 : 0;
+                    const pct = summary.count ? (b.count / summary.count) * 100 : 0;
                     return (
                       <div key={b.star} className="flex items-center gap-2">
                         <span className="flex w-9 items-center gap-0.5 text-[11px] font-bold text-[#5C4D3C]/70">
@@ -615,83 +639,126 @@ export function PropertyDetailPage({ property, backTo }: PropertyDetailPageProps
                 </div>
               </div>
 
-              {/* Write a review */}
-              <form onSubmit={submitReview} className="border-b border-mist py-6">
-                <p className="mb-3 text-sm font-extrabold text-[#342417]">Write a review</p>
-                <div className="mb-3 flex items-center gap-3">
-                  <span className="text-xs font-bold text-[#5C4D3C]/70">Your rating</span>
-                  <div className="flex items-center gap-1" onMouseLeave={() => setHoverRating(0)}>
-                    {[1, 2, 3, 4, 5].map((i) => {
-                      const filled = i <= (hoverRating || reviewForm.rating);
-                      return (
-                        <button
-                          key={i}
-                          type="button"
-                          onMouseEnter={() => setHoverRating(i)}
-                          onClick={() => setReviewForm((f) => ({ ...f, rating: i }))}
-                          className="cursor-pointer transition-transform hover:scale-110"
-                          aria-label={`${i} star${i > 1 ? "s" : ""}`}
-                        >
-                          <Star className={`h-6 w-6 ${filled ? "fill-[#E5A93A] text-[#E5A93A]" : "text-[#E0D4C5]"}`} />
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <textarea
-                  rows={3}
-                  value={reviewForm.comment}
-                  onChange={(e) => setReviewForm((f) => ({ ...f, comment: e.target.value }))}
-                  placeholder="Share your experience with this property…"
-                  className={`${fieldCls} resize-none`}
-                />
-                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <input
-                    value={reviewForm.name}
-                    onChange={(e) => setReviewForm((f) => ({ ...f, name: e.target.value }))}
-                    placeholder="Your name (optional)"
-                    className={`${fieldCls} sm:max-w-xs`}
-                  />
-                  <button
-                    type="submit"
+              {/* Write a review — sign-in required; owners can't review their own listing */}
+              {authLoading ? null : isOwner ? (
+                <p className="border-b border-mist py-6 text-sm text-[#5C4D3C]/70">
+                  You can’t review your own listing.
+                </p>
+              ) : !user ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-mist py-6">
+                  <p className="text-sm text-[#5C4D3C]/70">
+                    Log in to share your experience with this property.
+                  </p>
+                  <Link
+                    href="/login"
                     style={{ backgroundColor: accent }}
-                    className="flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white shadow-md transition hover:brightness-105 active:scale-[0.99] cursor-pointer"
+                    className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white shadow-md transition hover:brightness-105"
                   >
-                    <Send className="h-4 w-4" />
-                    Post review
-                  </button>
+                    Log in to review
+                  </Link>
                 </div>
-              </form>
+              ) : (
+                <form onSubmit={handleSubmitReview} className="border-b border-mist py-6">
+                  <p className="mb-3 text-sm font-extrabold text-[#342417]">
+                    {myReview ? "Update your review" : "Write a review"}
+                  </p>
+                  <div className="mb-3 flex items-center gap-3">
+                    <span className="text-xs font-bold text-[#5C4D3C]/70">Your rating</span>
+                    <div className="flex items-center gap-1" onMouseLeave={() => setHoverRating(0)}>
+                      {[1, 2, 3, 4, 5].map((i) => {
+                        const filled = i <= (hoverRating || reviewForm.rating);
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            onMouseEnter={() => setHoverRating(i)}
+                            onClick={() => setReviewForm((f) => ({ ...f, rating: i }))}
+                            className="cursor-pointer transition-transform hover:scale-110"
+                            aria-label={`${i} star${i > 1 ? "s" : ""}`}
+                          >
+                            <Star className={`h-6 w-6 ${filled ? "fill-[#E5A93A] text-[#E5A93A]" : "text-[#E0D4C5]"}`} />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <textarea
+                    rows={3}
+                    value={reviewForm.comment}
+                    onChange={(e) => setReviewForm((f) => ({ ...f, comment: e.target.value }))}
+                    placeholder="Share your experience with this property…"
+                    className={`${fieldCls} resize-none`}
+                  />
+                  <div className="mt-3 flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={submittingReview}
+                      style={{ backgroundColor: accent }}
+                      className="flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white shadow-md transition hover:brightness-105 active:scale-[0.99] disabled:opacity-60 cursor-pointer"
+                    >
+                      <Send className="h-4 w-4" />
+                      {submittingReview ? "Posting…" : myReview ? "Update review" : "Post review"}
+                    </button>
+                  </div>
+                </form>
+              )}
 
               {/* List */}
               <div className="divide-y divide-mist">
-                {reviews.map((r) => (
-                  <div key={r.id} className="flex gap-3 py-5">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#342417] text-xs font-extrabold text-white">
-                      {r.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-sm font-bold text-[#342417]">{r.name}</p>
-                        <span className="text-[11px] text-[#5C4D3C]/55">
-                          {new Date(r.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                        </span>
+                {reviews.length === 0 && (
+                  <p className="py-6 text-sm text-[#5C4D3C]/60">
+                    No reviews yet — be the first to share your experience.
+                  </p>
+                )}
+                {reviews.map((r) => {
+                  const name = authorName(r);
+                  const isMine = myReview?._id === r._id;
+                  return (
+                    <div key={r._id} className="flex gap-3 py-5">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#342417] text-xs font-extrabold text-white">
+                        {name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
                       </div>
-                      <div className="mt-0.5">
-                        <Stars value={r.rating} size="h-3.5 w-3.5" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-sm font-bold text-[#342417]">
+                            {name}
+                            {isMine && (
+                              <span className="ml-2 rounded-md bg-[#FBF7EF] px-1.5 py-0.5 text-[10px] font-bold text-[#5C4D3C]/70">
+                                You
+                              </span>
+                            )}
+                          </p>
+                          <span className="text-[11px] text-[#5C4D3C]/55">
+                            {new Date(r.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                          </span>
+                        </div>
+                        <div className="mt-0.5">
+                          <Stars value={r.rating} size="h-3.5 w-3.5" />
+                        </div>
+                        <p className="mt-2 text-sm leading-relaxed text-[#5C4D3C]">{r.comment}</p>
+                        <div className="mt-2 flex items-center gap-4">
+                          <button
+                            type="button"
+                            onClick={() => toast.success("Marked as helpful.")}
+                            className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#5C4D3C]/60 transition hover:text-[#342417] cursor-pointer"
+                          >
+                            <ThumbsUp className="h-3.5 w-3.5" />
+                            Helpful
+                          </button>
+                          {isMine && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteReview(r._id)}
+                              className="text-[11px] font-bold text-red-500/80 transition hover:text-red-600 cursor-pointer"
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <p className="mt-2 text-sm leading-relaxed text-[#5C4D3C]">{r.comment}</p>
-                      <button
-                        type="button"
-                        onClick={() => toast.success("Marked as helpful.")}
-                        className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold text-[#5C4D3C]/60 transition hover:text-[#342417] cursor-pointer"
-                      >
-                        <ThumbsUp className="h-3.5 w-3.5" />
-                        Helpful
-                      </button>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </Card>
           </div>
