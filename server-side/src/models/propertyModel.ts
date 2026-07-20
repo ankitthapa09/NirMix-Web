@@ -20,6 +20,8 @@ export interface IProperty extends Document {
   };
   price: number;
   videoLink?: string;
+  ratingAverage: number;
+  ratingCount: number;
   details: Record<string, unknown>;
   photos: IPropertyMedia[];
   floorPlan?: IPropertyMedia;
@@ -94,6 +96,18 @@ const propertySchema = new Schema<IProperty>(
     videoLink: {
       type: String,
       trim: true,
+    },
+    // Kept in sync by the review service so listing queries carry ratings for free.
+    ratingAverage: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5,
+    },
+    ratingCount: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
     // Type-specific specs from the wizard's Details step (houseType, beds, landArea, …).
     details: {
