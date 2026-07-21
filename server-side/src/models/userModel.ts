@@ -1,6 +1,7 @@
 import mongoose, { Document, Schema, Types } from "mongoose";
 import bcrypt from 'bcryptjs';
 import { ALL_Portfolio_ROLES, PortfolioRole } from "../constants/portfolioRoles";
+import { ALL_USER_ROLES, USER_ROLES, UserRole } from "../constants/userRoles";
 
 export interface IUser extends Document{
     // core identity
@@ -27,7 +28,7 @@ export interface IUser extends Document{
     profession: PortfolioRole[];
     savedProperties: Types.ObjectId[];
 
-    isAdmim: boolean;
+    role: UserRole;
     isEmailVerified: boolean;
     isVerified: boolean;
     isActive: boolean;
@@ -141,9 +142,10 @@ const userSchema = new Schema <IUser>(
             default: []
         },
 
-        isAdmim: {
-            type: Boolean,
-            default: false        // admins are created via admin panel
+        role: {
+            type: String,
+            enum: ALL_USER_ROLES,
+            default: USER_ROLES.USER    // admins are promoted via admin panel / seed script
         },
 
         isEmailVerified: {
