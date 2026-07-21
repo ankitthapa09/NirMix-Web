@@ -1,8 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import authService from '../services/auth.service.js';
+import { findUserById } from '../repositories/user.repository.js';
 import { ApiError } from '../utils/ApiError.js';
 import { HTTP_STATUS } from '../constants/httpStatus.js';
 import { IJwtPayload } from '../types/auth.types.js';
+import { USER_ROLES, UserRole } from '../constants/userRoles.js';
 
 // Extend Express Request type to include user property
 declare global {
@@ -89,25 +91,42 @@ export const isAuthenticated = (
 };
 
 /**
- * Middleware to check if user is admin
- * Must be used after verifyAccessToken middleware
+ * Role-gate factory. Returns middleware that allows the request through only if
+ * the caller's *current* role (looked up fresh, not read from the token) is one
+ * of `allowedRoles`. A fresh lookup means a demoted or suspended admin loses
+ * access on their next request rather than when their token expires.
+ * Must be used after verifyAccessToken middleware.
  */
-export const isAdmin = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
-  try {
-    if (!req.user) {
-      throw new ApiError(HTTP_STATUS.UNAUTHORIZED, 'User not authenticated');
+export const requireRole = (...allowedRoles: UserRole[]) => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user) {
+        throw new ApiError(HTTP_STATUS.UNAUTHORIZED, 'User not authenticated');
+      }
+
+      const user = await findUserById(req.user.id);
+      if (!user) {
+        throw new ApiError(HTTP_STATUS.UNAUTHORIZED, 'User not found');
+      }
+      if (!user.isActive) {
+        throw new ApiError(HTTP_STATUS.FORBIDDEN, 'Account is deactivated');
+      }
+      if (!allowedRoles.includes(user.role)) {
+        throw new ApiError(HTTP_STATUS.FORBIDDEN, 'You do not have permission to perform this action');
+      }
+
+      next();
+    } catch (error) {
+      next(error);
     }
-    
-    // Check admin status placeholder
-    next();
-  } catch (error) {
-    next(error);
-  }
+  };
 };
+
+/**
+ * Middleware to check if user is admin.
+ * Must be used after verifyAccessToken middleware.
+ */
+export const isAdmin = requireRole(USER_ROLES.ADMIN);
 
 /**
  * Optional Auth Middleware
