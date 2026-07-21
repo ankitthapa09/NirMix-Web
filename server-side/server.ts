@@ -10,6 +10,7 @@ import portfolioRoutes from './src/routes/portfolio.routes.js';
 import visitRoutes from './src/routes/visit.routes.js';
 import reviewRoutes from './src/routes/review.routes.js';
 import notificationRoutes from './src/routes/notification.routes.js';
+import adminRoutes from './src/routes/admin.routes.js';
 import { errorHandler, notFoundHandler } from './src/middlewares/error.middleware.js';
 import 'dotenv/config';
 
@@ -59,7 +60,10 @@ app.use('/api/reviews', reviewRoutes);
 // Notification Routes
 app.use('/api/notifications', notificationRoutes);
 
-// ERROR HANDLING 
+// Admin Routes
+app.use('/api/admin', adminRoutes);
+
+// ERROR HANDLING
 
 // 404 Handler (must be before error handler)
 app.use(notFoundHandler);
